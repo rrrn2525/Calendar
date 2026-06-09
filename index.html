@@ -14,7 +14,6 @@
     background: #f5f5f5;
   }
 
-  /* スマホ幅にフィット */
   .calendar-wrapper {
     max-width: 390px;
     width: 100%;
@@ -49,8 +48,6 @@
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 2px;
-    align-content: start;
-    width: 100%;
   }
 
   .dow {
@@ -104,7 +101,6 @@
     width: 90%;
     max-width: 360px;
     border-radius: 8px;
-    z-index: 10000;
   }
 
   .modal input, .modal select {
@@ -128,20 +124,34 @@
     width: 10%;
     text-align: center;
   }
-  .digit-row input {
-    margin-right: 4px;
-  }
   .digit-label {
     font-size: 14px;
     color: #555;
   }
 
+  /* 色ボタン（白丸表示対応） */
+  .color-buttons {
+    display: flex;
+    margin: 8px 0;
+  }
   .color-buttons button {
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     border: none;
-    margin-right: 6px;
+    margin-right: 8px;
+    position: relative;
+  }
+  .color-buttons button.selected::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    background: white;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
   }
 
   .btn-row {
@@ -149,12 +159,6 @@
     justify-content: space-between;
   }
 
-  .btn-row button {
-    padding: 6px 10px;
-    font-size: 14px;
-  }
-
-  /* 下に表示する予定一覧 */
   #dayEventList {
     margin-top: 15px;
     padding: 10px;
@@ -183,7 +187,6 @@
 
   <div class="calendar-grid" id="calendar"></div>
 
-  <!-- 1回タップでここに予定一覧が出る -->
   <div id="dayEventList"></div>
 </div>
 
@@ -201,7 +204,7 @@
       <option value="yearly">毎年</option>
     </select>
 
-    <!-- 〇日が付く日：横一列＋「がつく日」 -->
+    <!-- 〇日が付く日 -->
     <div class="digit-boxes" id="digitBoxes">
       <div class="digit-row">
         <label><input type="checkbox" value="0">0</label>
@@ -218,6 +221,7 @@
       <div class="digit-label">がつく日</div>
     </div>
 
+    <!-- 色選択 -->
     <div class="color-buttons" id="modalColors">
       <button data-color="#007bff" style="background:#007bff"></button>
       <button data-color="#28a745" style="background:#28a745"></button>
@@ -235,6 +239,9 @@
 </div>
 
 <script>
+/* -------------------------
+   基本変数
+------------------------- */
 let events = [];
 let currentYear = new Date().getFullYear();
 let currentMonth = new Date().getMonth();
@@ -242,6 +249,9 @@ let selectedDate = null;
 let editingId = null;
 let modalColor = "#007bff";
 
+/* -------------------------
+   保存・読み込み
+------------------------- */
 function saveEvents() {
   localStorage.setItem("calendarEvents", JSON.stringify(events));
 }
@@ -251,6 +261,9 @@ function loadEvents() {
 }
 loadEvents();
 
+/* -------------------------
+   年月選択初期化
+------------------------- */
 function initYM() {
   const yearSel = document.getElementById("yearSelect");
   const monthSel = document.getElementById("monthSelect");
@@ -279,6 +292,9 @@ document.getElementById("applyYM").onclick = () => {
   renderCalendar();
 };
 
+/* -------------------------
+   カレンダー描画
+------------------------- */
 const calendarEl = document.getElementById("calendar");
 const calTitleEl = document.getElementById("calTitle");
 
@@ -353,6 +369,9 @@ function renderCalendar() {
   }
 }
 
+/* -------------------------
+   日付文字列
+------------------------- */
 function toStr(d){
   const y=d.getFullYear();
   const m=("0"+(d.getMonth()+1)).slice(-2);
@@ -365,11 +384,15 @@ function isSame(a,b){
          a.getDate()==b.getDate();
 }
 
+/* -------------------------
+   予定取得（繰り返し + 一桁判定）
+------------------------- */
 function getEvents(dateObj){
   const res=[];
   const ds=toStr(dateObj);
   const dow=dateObj.getDay();
   const day=dateObj.getDate();
+  const lastDigit = String(day).slice(-1); // ← 一桁だけを見る
   const mon=dateObj.getMonth()+1;
 
   events.forEach(ev=>{
@@ -382,8 +405,7 @@ function getEvents(dateObj){
        base.getMonth()+1===mon && base.getDate()===day) res.push(ev);
 
     if (ev.digits && ev.digits.length > 0) {
-      const dayStr = String(day);
-      if (ev.digits.some(d => dayStr.includes(d))) {
+      if (ev.digits.includes(lastDigit)) {
         if (dateObj >= base) res.push(ev);
       }
     }
@@ -392,6 +414,9 @@ function getEvents(dateObj){
   return res;
 }
 
+/* -------------------------
+   1回タップ → 下に予定一覧
+------------------------- */
 function showDayEvents(dateStr){
   const dateObj = new Date(dateStr);
   const list = getEvents(dateObj);
@@ -420,6 +445,11 @@ function deleteFromList(id){
   document.getElementById("dayEventList").innerHTML = "";
 }
 
+ }
+
+/* -------------------------
+   モーダル制御
+------------------------- */
 const modalBg = document.getElementById("modalBg");
 const modalTitle = document.getElementById("modalTitle");
 const modalEventTitle = document.getElementById("modalEventTitle");
@@ -430,12 +460,23 @@ document.getElementById("modalClose").onclick = () => {
   modalBg.style.display = "none";
 };
 
+/* -------------------------
+   色選択（白丸表示）
+------------------------- */
 document.getElementById("modalColors").onclick = e => {
   if (e.target.tagName === "BUTTON") {
     modalColor = e.target.dataset.color;
+
+    document.querySelectorAll("#modalColors button")
+      .forEach(btn => btn.classList.remove("selected"));
+
+    e.target.classList.add("selected");
   }
 };
 
+/* -------------------------
+   数字チェック
+------------------------- */
 function getSelectedDigits() {
   const boxes = document.querySelectorAll("#digitBoxes input");
   return [...boxes].filter(b => b.checked).map(b => b.value);
@@ -446,6 +487,9 @@ function setSelectedDigits(arr) {
   boxes.forEach(b => b.checked = arr.includes(b.value));
 }
 
+/* -------------------------
+   予定追加モード
+------------------------- */
 function openAdd(dateStr){
   selectedDate = dateStr;
   editingId = null;
@@ -457,9 +501,17 @@ function openAdd(dateStr){
   modalDelete.style.display = "none";
   setSelectedDigits([]);
 
+  document.querySelectorAll("#modalColors button")
+    .forEach(btn => btn.classList.remove("selected"));
+  document.querySelector("#modalColors button[data-color='#007bff']")
+    .classList.add("selected");
+
   modalBg.style.display = "flex";
 }
 
+/* -------------------------
+   予定編集モード
+------------------------- */
 function openEdit(id){
   editingId = id;
   const ev = events.find(e => e.id === id);
@@ -471,9 +523,17 @@ function openEdit(id){
   modalDelete.style.display = "inline-block";
   setSelectedDigits(ev.digits || []);
 
+  document.querySelectorAll("#modalColors button")
+    .forEach(btn => btn.classList.remove("selected"));
+  document.querySelector(`#modalColors button[data-color='${ev.color}']`)
+    .classList.add("selected");
+
   modalBg.style.display = "flex";
 }
 
+/* -------------------------
+   保存処理
+------------------------- */
 document.getElementById("modalSave").onclick = () => {
   const title = modalEventTitle.value.trim();
   if (!title) return;
@@ -503,6 +563,9 @@ document.getElementById("modalSave").onclick = () => {
   renderCalendar();
 };
 
+/* -------------------------
+   削除処理
+------------------------- */
 modalDelete.onclick = () => {
   events = events.filter(e => e.id !== editingId);
   saveEvents();
@@ -510,23 +573,31 @@ modalDelete.onclick = () => {
   renderCalendar();
 };
 
+/* -------------------------
+   月移動
+------------------------- */
 document.getElementById("prevMonth").onclick = () => {
   currentMonth--;
   if (currentMonth < 0) { currentMonth = 11; currentYear--; }
   renderCalendar();
 };
+
 document.getElementById("nextMonth").onclick = () => {
   currentMonth++;
   if (currentMonth > 11) { currentMonth = 0; currentYear++; }
   renderCalendar();
 };
 
+/* -------------------------
+   スワイプで月移動
+------------------------- */
 let startX = 0;
 const swipeArea = document.getElementById("swipeArea");
 
 swipeArea.addEventListener("touchstart", e => {
   startX = e.touches[0].clientX;
 });
+
 swipeArea.addEventListener("touchend", e => {
   const diff = e.changedTouches[0].clientX - startX;
   if (Math.abs(diff) > 50) {
@@ -541,8 +612,12 @@ swipeArea.addEventListener("touchend", e => {
   }
 });
 
+/* -------------------------
+   初期化
+------------------------- */
 initYM();
 renderCalendar();
+
 </script>
 </body>
 </html>
