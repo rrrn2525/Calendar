@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>予定カレンダー</title>
+<style>
+*{
+   box-sizing:border-box;
+}
+body{
+   font-family:sans-serif;
+   margin:10px;
+}
+.header{
+   display:flex;
+   justify-content:space-between;
+   align-items:center;
+   margin-bottom:10px;
+}
+button{
+   padding:8px 12px;
+}
+#monthTitle{
+   font-size:20px;
+   font-weight:bold;
+}
+.weekdays,
+#calendar{
+   display:grid;
+   grid-template-columns:repeat(7,1fr);
+   gap:3px;
+}
+.weekday{
+   text-align:center;
+   font-weight:bold;
+   padding:8px;
+   background:#eee;
+}
+.day{
+   border:1px solid #ccc;
+   min-height:100px;
+   padding:4px;
+   overflow:hidden;
+}
+.today{
+   border:3px solid red;
+}
+.day-number{
+   font-weight:bold;
+}
+.event{
+   color:white;
+   padding:3px;
+   border-radius:4px;
+   margin-top:3px;
+   font-size:12px;
+   cursor:grab;
+}
+.school{
+   background:#2196F3;
+}
+.work{
+   background:#FF9800;
+}
+.play{
+   background:#4CAF50;
+}
+.other{
+   background:#9C27B0;
+}
+@media(max-width:600px){
+   .day{
+       min-height:80px;
+   }
+   .event{
+       font-size:10px;
+   }
+}
+</style>
+</head>
+<body>
+<div class="header">
+<button onclick="changeMonth(-1)">◀</button>
+<div id="monthTitle"></div>
+<button onclick="changeMonth(1)">▶</button>
+</div>
+<div class="weekdays">
+<div class="weekday">月</div>
+<div class="weekday">火</div>
+<div class="weekday">水</div>
+<div class="weekday">木</div>
+<div class="weekday">金</div>
+<div class="weekday">土</div>
+<div class="weekday">日</div>
+</div>
+<div id="calendar"></div>
+<script>
+let currentDate = new Date();
+let draggedEvent = null;
+function renderCalendar(){
+   const calendar =
+       document.getElementById("calendar");
+   calendar.innerHTML = "";
+   const year =
+       currentDate.getFullYear();
+   const month =
+       currentDate.getMonth();
+   document.getElementById(
+       "monthTitle"
+   ).textContent =
+       `${year}年 ${month+1}月`;
+   let firstDay =
+       new Date(year,month,1).getDay();
+   firstDay = firstDay === 0 ? 6 : firstDay-1;
+   const lastDate =
+       new Date(year,month+1,0).getDate();
+   for(let i=0;i<firstDay;i++){
+       calendar.appendChild(
+           document.createElement("div")
+       );
+   }
+   for(let day=1;day<=lastDate;day++){
+       const key =
+           `${year}-${month+1}-${day}`;
+       const dayDiv =
+           document.createElement("div");
+       dayDiv.className="day";
+       const today =
+           new Date();
+       if(
+           day===today.getDate() &&
+           month===today.getMonth() &&
+           year===today.getFullYear()
+       ){
+           dayDiv.classList.add("today");
+       }
+       let html =
+           `<div class="day-number">${day}</div>`;
+       const events =
+           JSON.parse(
+               localStorage.getItem(key)
+               || "[]"
+           );
+       events.forEach((event,index)=>{
+           html += `
+<div
+               class="event ${event.color}"
+               draggable="true"
+               data-key="${key}"
+               data-index="${index}"
+>
+               ${event.text}
+</div>`;
+       });
+       dayDiv.innerHTML = html;
+       dayDiv.addEventListener(
+           "dblclick",
+           ()=>addEvent(key)
+       );
+       dayDiv.addEventListener(
+           "dragover",
+           e=>e.preventDefault()
+       );
+       dayDiv.addEventListener(
+           "drop",
+           ()=>moveEvent(key)
+       );
+       calendar.appendChild(dayDiv);
+   }
+   document
+   .querySelectorAll(".event")
+   .forEach(el=>{
+       el.addEventListener(
+           "dragstart",
+           ()=>{
+               draggedEvent={
+                   source:
+                       el.dataset.key,
+                   index:
+                       Number(
+                           el.dataset.index
+                       )
+               };
+           }
+       );
+       el.addEventListener(
+           "click",
+           e=>{
+               e.stopPropagation();
+               if(
+                   confirm(
+                   "予定を削除しますか？"
+                   )
+               ){
+                   const key =
+                       el.dataset.key;
+                   let events =
+                       JSON.parse(
+                       localStorage
+                       .getItem(key)
+                       || "[]"
+                   );
+                   events.splice(
+                       Number(
+                           el.dataset.index
+                       ),
+                       1
+                   );
+                   localStorage
+                   .setItem(
+                       key,
+                       JSON.stringify(events)
+                   );
+                   renderCalendar();
+               }
+           }
+       );
+   });
+}
+function addEvent(key){
+   const text =
+       prompt("予定を入力");
+   if(!text) return;
+   const color =
+       prompt(
+`種類を入力
+school
+work
+play
+other`
+       );
+   let events =
+       JSON.parse(
+           localStorage.getItem(key)
+           || "[]"
+       );
+   events.push({
+       text:text,
+       color:color || "other"
+   });
+   localStorage.setItem(
+       key,
+       JSON.stringify(events)
+   );
+   renderCalendar();
+}
+function moveEvent(targetKey){
+   if(!draggedEvent) return;
+   let sourceEvents =
+       JSON.parse(
+       localStorage.getItem(
+           draggedEvent.source
+       ) || "[]"
+   );
+   const moved =
+       sourceEvents.splice(
+           draggedEvent.index,
+           1
+       )[0];
+   localStorage.setItem(
+       draggedEvent.source,
+       JSON.stringify(sourceEvents)
+   );
+   let targetEvents =
+       JSON.parse(
+           localStorage.getItem(
+               targetKey
+           ) || "[]"
+       );
+   targetEvents.push(moved);
+   localStorage.setItem(
+       targetKey,
+       JSON.stringify(targetEvents)
+   );
+   renderCalendar();
+}
+function changeMonth(num){
+   currentDate.setMonth(
+       currentDate.getMonth()+num
+   );
+   renderCalendar();
+}
+renderCalendar();
+</script>
+</body>
+</html>
