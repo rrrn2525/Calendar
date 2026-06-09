@@ -24,6 +24,16 @@
     min-height: 100vh;
   }
 
+  .ym-select {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .ym-select select {
+    width: 48%;
+    padding: 6px;
+  }
+
   .cal-header {
     display: flex;
     justify-content: space-between;
@@ -74,7 +84,7 @@
     cursor: pointer;
   }
 
-  /* モーダル（カレンダーの上に重ねる） */
+  /* モーダル */
   .modal-bg {
     position: fixed;
     top: 0;
@@ -103,12 +113,27 @@
     margin-bottom: 8px;
   }
 
+  /* 〇日が付く日 UI */
   .digit-boxes {
-    margin: 8px 0;
+    margin: 10px 0;
+    text-align: center;
   }
-  .digit-boxes label {
-    margin-right: 6px;
+  .digit-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .digit-row label {
+    font-size: 16px;
+    width: 10%;
+    text-align: center;
+  }
+  .digit-row input {
+    margin-right: 4px;
+  }
+  .digit-label {
     font-size: 14px;
+    color: #555;
   }
 
   .color-buttons button {
@@ -142,6 +167,14 @@
 <body>
 
 <div class="calendar-wrapper" id="swipeArea">
+
+  <!-- 年月選択 -->
+  <div class="ym-select">
+    <select id="yearSelect"></select>
+    <select id="monthSelect"></select>
+  </div>
+  <button id="applyYM" style="width:100%;padding:6px;margin-bottom:10px;">表示</button>
+
   <div class="cal-header">
     <button id="prevMonth">&lt;</button>
     <div class="cal-title" id="calTitle"></div>
@@ -168,18 +201,21 @@
       <option value="yearly">毎年</option>
     </select>
 
+    <!-- 〇日が付く日：横一列＋「がつく日」 -->
     <div class="digit-boxes" id="digitBoxes">
-      <div>数字が付く日（複数選択可）</div>
-      <label><input type="checkbox" value="0">0</label>
-      <label><input type="checkbox" value="1">1</label>
-      <label><input type="checkbox" value="2">2</label>
-      <label><input type="checkbox" value="3">3</label>
-      <label><input type="checkbox" value="4">4</label>
-      <label><input type="checkbox" value="5">5</label>
-      <label><input type="checkbox" value="6">6</label>
-      <label><input type="checkbox" value="7">7</label>
-      <label><input type="checkbox" value="8">8</label>
-      <label><input type="checkbox" value="9">9</label>
+      <div class="digit-row">
+        <label><input type="checkbox" value="0">0</label>
+        <label><input type="checkbox" value="1">1</label>
+        <label><input type="checkbox" value="2">2</label>
+        <label><input type="checkbox" value="3">3</label>
+        <label><input type="checkbox" value="4">4</label>
+        <label><input type="checkbox" value="5">5</label>
+        <label><input type="checkbox" value="6">6</label>
+        <label><input type="checkbox" value="7">7</label>
+        <label><input type="checkbox" value="8">8</label>
+        <label><input type="checkbox" value="9">9</label>
+      </div>
+      <div class="digit-label">がつく日</div>
     </div>
 
     <div class="color-buttons" id="modalColors">
@@ -199,9 +235,6 @@
 </div>
 
 <script>
-/* -------------------------
-   基本変数
-------------------------- */
 let events = [];
 let currentYear = new Date().getFullYear();
 let currentMonth = new Date().getMonth();
@@ -209,9 +242,6 @@ let selectedDate = null;
 let editingId = null;
 let modalColor = "#007bff";
 
-/* -------------------------
-   保存・読み込み
-------------------------- */
 function saveEvents() {
   localStorage.setItem("calendarEvents", JSON.stringify(events));
 }
@@ -221,9 +251,34 @@ function loadEvents() {
 }
 loadEvents();
 
-/* -------------------------
-   カレンダー描画
-------------------------- */
+function initYM() {
+  const yearSel = document.getElementById("yearSelect");
+  const monthSel = document.getElementById("monthSelect");
+  const thisYear = new Date().getFullYear();
+
+  for (let y = thisYear - 5; y <= thisYear + 5; y++) {
+    const op = document.createElement("option");
+    op.value = y;
+    op.textContent = y + "年";
+    if (y === currentYear) op.selected = true;
+    yearSel.appendChild(op);
+  }
+
+  for (let m = 1; m <= 12; m++) {
+    const op = document.createElement("option");
+    op.value = m - 1;
+    op.textContent = m + "月";
+    if (m - 1 === currentMonth) op.selected = true;
+    monthSel.appendChild(op);
+  }
+}
+
+document.getElementById("applyYM").onclick = () => {
+  currentYear = Number(document.getElementById("yearSelect").value);
+  currentMonth = Number(document.getElementById("monthSelect").value);
+  renderCalendar();
+};
+
 const calendarEl = document.getElementById("calendar");
 const calTitleEl = document.getElementById("calTitle");
 
@@ -285,12 +340,12 @@ function renderCalendar() {
       if (tapTimer == null) {
         tapTimer = setTimeout(() => {
           tapTimer = null;
-          showDayEvents(dateStr);   // ← 1回タップで下に表示
+          showDayEvents(dateStr);
         }, 250);
       } else {
         clearTimeout(tapTimer);
         tapTimer = null;
-        openAdd(dateStr);           // ← ダブルタップで追加
+        openAdd(dateStr);
       }
     });
 
@@ -298,9 +353,6 @@ function renderCalendar() {
   }
 }
 
-/* -------------------------
-   日付文字列
-------------------------- */
 function toStr(d){
   const y=d.getFullYear();
   const m=("0"+(d.getMonth()+1)).slice(-2);
@@ -313,9 +365,6 @@ function isSame(a,b){
          a.getDate()==b.getDate();
 }
 
-/* -------------------------
-   予定取得（繰り返し対応 + 数字が付く日）
-------------------------- */
 function getEvents(dateObj){
   const res=[];
   const ds=toStr(dateObj);
@@ -343,9 +392,6 @@ function getEvents(dateObj){
   return res;
 }
 
-/* -------------------------
-   1回タップ → 下に予定一覧表示
-------------------------- */
 function showDayEvents(dateStr){
   const dateObj = new Date(dateStr);
   const list = getEvents(dateObj);
@@ -374,9 +420,6 @@ function deleteFromList(id){
   document.getElementById("dayEventList").innerHTML = "";
 }
 
-/* -------------------------
-   モーダル制御
-------------------------- */
 const modalBg = document.getElementById("modalBg");
 const modalTitle = document.getElementById("modalTitle");
 const modalEventTitle = document.getElementById("modalEventTitle");
@@ -387,28 +430,22 @@ document.getElementById("modalClose").onclick = () => {
   modalBg.style.display = "none";
 };
 
-/* 色選択 */
 document.getElementById("modalColors").onclick = e => {
   if (e.target.tagName === "BUTTON") {
     modalColor = e.target.dataset.color;
   }
 };
 
-/* 数字チェック取得 */
 function getSelectedDigits() {
   const boxes = document.querySelectorAll("#digitBoxes input");
   return [...boxes].filter(b => b.checked).map(b => b.value);
 }
 
-/* 数字チェック反映 */
 function setSelectedDigits(arr) {
   const boxes = document.querySelectorAll("#digitBoxes input");
   boxes.forEach(b => b.checked = arr.includes(b.value));
 }
 
-/* -------------------------
-   予定追加モード
-------------------------- */
 function openAdd(dateStr){
   selectedDate = dateStr;
   editingId = null;
@@ -423,9 +460,6 @@ function openAdd(dateStr){
   modalBg.style.display = "flex";
 }
 
-/* -------------------------
-   予定編集モード
-------------------------- */
 function openEdit(id){
   editingId = id;
   const ev = events.find(e => e.id === id);
@@ -440,9 +474,6 @@ function openEdit(id){
   modalBg.style.display = "flex";
 }
 
-/* -------------------------
-   保存ボタン
-------------------------- */
 document.getElementById("modalSave").onclick = () => {
   const title = modalEventTitle.value.trim();
   if (!title) return;
@@ -472,9 +503,6 @@ document.getElementById("modalSave").onclick = () => {
   renderCalendar();
 };
 
-/* -------------------------
-   削除ボタン
-------------------------- */
 modalDelete.onclick = () => {
   events = events.filter(e => e.id !== editingId);
   saveEvents();
@@ -482,9 +510,6 @@ modalDelete.onclick = () => {
   renderCalendar();
 };
 
-/* -------------------------
-   月移動
-------------------------- */
 document.getElementById("prevMonth").onclick = () => {
   currentMonth--;
   if (currentMonth < 0) { currentMonth = 11; currentYear--; }
@@ -496,9 +521,6 @@ document.getElementById("nextMonth").onclick = () => {
   renderCalendar();
 };
 
-/* -------------------------
-   スワイプで月切り替え
-------------------------- */
 let startX = 0;
 const swipeArea = document.getElementById("swipeArea");
 
@@ -519,9 +541,7 @@ swipeArea.addEventListener("touchend", e => {
   }
 });
 
-/* -------------------------
-   初期描画
-------------------------- */
+initYM();
 renderCalendar();
 </script>
 </body>
