@@ -417,8 +417,7 @@ function getEvents(dateObj){
     if(ev.repeat==="none" && ev.baseDate===ds) res.push(ev);
     if(ev.repeat==="weekly" && dateObj>=base && base.getDay()===dow) res.push(ev);
     if(ev.repeat==="monthly" && dateObj>=base && base.getDate()===day) res.push(ev);
-    if(ev.repeat==="yearly" && dateObj>=base &&
-       base.getMonth()+1===mon && base.getDate()===day) res.push(ev);
+    if (ev.repeat === "yearly" && base.getMonth() + 1 === mon && base.getDate() === day) { res.push(ev); }
 
     if (ev.digits && ev.digits.length > 0) {
       if (ev.digits.includes(lastDigit)) {
