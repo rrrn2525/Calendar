@@ -2,13 +2,11 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>カレンダー</title>
+<title>カレンダー完成版</title>
 <style>
-  * {
-    box-sizing: border-box;
-  }
+  * { box-sizing: border-box; }
   body {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family: system-ui, sans-serif;
     margin: 0;
     padding: 10px;
     background: #f5f5f5;
@@ -23,7 +21,6 @@
   }
   .cal-header {
     display: flex;
-    align-items: center;
     justify-content: space-between;
     margin-bottom: 8px;
   }
@@ -39,6 +36,7 @@
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     gap: 2px;
+    align-content: start;
   }
   .dow {
     text-align: center;
@@ -54,11 +52,6 @@
     padding: 2px;
     font-size: 11px;
     position: relative;
-    overflow: hidden;
-  }
-  .day-number {
-    font-weight: bold;
-    font-size: 12px;
   }
   .today {
     outline: 2px solid #ff4d4d;
@@ -70,343 +63,393 @@
     border-radius: 3px;
     color: #fff;
     font-size: 10px;
-    cursor: grab;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
-  .event.dragging {
-    opacity: 0.5;
-  }
-  .day-cell.drop-target {
-    outline: 2px dashed #007bff;
+  .event button {
+    background: rgba(0,0,0,0.3);
+    border: none;
+    color: #fff;
+    font-size: 10px;
+    margin-left: 4px;
+    cursor: pointer;
+    border-radius: 2px;
+    padding: 0 3px;
   }
 
-  .controls {
-    margin-top: 10px;
-    font-size: 13px;
+  /* 編集モーダル */
+  .modal-bg {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.4);
+    display: none;
+    justify-content: center;
+    align-items: center;
   }
-  .controls-row {
-    margin-bottom: 6px;
+  .modal {
+    background: #fff;
+    padding: 15px;
+    width: 90%;
+    max-width: 360px;
+    border-radius: 8px;
   }
-  .color-buttons button {
-    width: 24px;
-    height: 24px;
+  .modal input, .modal select {
+    width: 100%;
+    padding: 6px;
+    margin-bottom: 8px;
+  }
+  .modal .color-buttons button {
+    width: 24px; height: 24px;
     border-radius: 50%;
     border: none;
     margin-right: 4px;
-    cursor: pointer;
   }
-  .color-buttons button.selected {
-    outline: 2px solid #000;
+  .modal .btn-row {
+    display: flex;
+    justify-content: space-between;
   }
-  input[type="text"] {
-    width: 100%;
-    padding: 4px;
-    font-size: 13px;
-  }
-  select {
-    width: 100%;
-    padding: 4px;
-    font-size: 13px;
-  }
-
-  @media (max-width: 480px) {
-    .day-cell {
-      min-height: 52px;
-    }
-    .cal-title {
-      font-size: 14px;
-    }
+  .modal button {
+    padding: 6px 10px;
+    font-size: 14px;
   }
 </style>
 </head>
 <body>
-<div class="calendar-wrapper">
+
+<div class="calendar-wrapper" id="swipeArea">
   <div class="cal-header">
     <button id="prevMonth">&lt;</button>
     <div class="cal-title" id="calTitle"></div>
     <button id="nextMonth">&gt;</button>
   </div>
 
-  <div class="calendar-grid" id="calendar">
-    <!-- 曜日ヘッダ -->
-  </div>
+  <div class="calendar-grid" id="calendar"></div>
 
   <div class="controls">
-    <div class="controls-row">
-      <label>予定タイトル</label>
-      <input type="text" id="eventTitle" placeholder="例：打ち合わせ、誕生日など">
+    <label>予定タイトル</label>
+    <input type="text" id="eventTitle">
+
+    <label>繰り返し</label>
+    <select id="repeatType">
+      <option value="none">なし</option>
+      <option value="weekly">毎週</option>
+      <option value="monthly">毎月</option>
+      <option value="yearly">毎年</option>
+    </select>
+
+    <label>色</label>
+    <div class="color-buttons" id="colorButtons">
+      <button data-color="#007bff" style="background:#007bff"></button>
+      <button data-color="#28a745" style="background:#28a745"></button>
+      <button data-color="#ffc107" style="background:#ffc107"></button>
+      <button data-color="#dc3545" style="background:#dc3545"></button>
+      <button data-color="#6f42c1" style="background:#6f42c1"></button>
     </div>
-    <div class="controls-row">
-      <label>繰り返し</label>
-      <select id="repeatType">
-        <option value="none">なし</option>
-        <option value="weekly">毎週</option>
-        <option value="monthly">毎月</option>
-        <option value="yearly">毎年</option>
-      </select>
+    <small>日付を押すと予定追加（タイトルは初期化）</small>
+  </div>
+</div>
+
+<!-- 編集モーダル -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3>予定を編集</h3>
+    <input type="text" id="editTitle">
+    <select id="editRepeat">
+      <option value="none">なし</option>
+      <option value="weekly">毎週</option>
+      <option value="monthly">毎月</option>
+      <option value="yearly">毎年</option>
+    </select>
+
+    <div class="color-buttons" id="editColors">
+      <button data-color="#007bff" style="background:#007bff"></button>
+      <button data-color="#28a745" style="background:#28a745"></button>
+      <button data-color="#ffc107" style="background:#ffc107"></button>
+      <button data-color="#dc3545" style="background:#dc3545"></button>
+      <button data-color="#6f42c1" style="background:#6f42c1"></button>
     </div>
-    <div class="controls-row">
-      <label>色を選択</label>
-      <div class="color-buttons" id="colorButtons">
-        <button data-color="#007bff" style="background:#007bff"></button>
-        <button data-color="#28a745" style="background:#28a745"></button>
-        <button data-color="#ffc107" style="background:#ffc107"></button>
-        <button data-color="#dc3545" style="background:#dc3545"></button>
-        <button data-color="#6f42c1" style="background:#6f42c1"></button>
-      </div>
-    </div>
-    <div class="controls-row">
-      <small>※ 日付をタップすると、その日に予定を追加します。</small>
+
+    <div class="btn-row">
+      <button id="saveEdit">保存</button>
+      <button id="deleteEdit">削除</button>
+      <button id="closeEdit">閉じる</button>
     </div>
   </div>
 </div>
 
 <script>
-  // ====== カレンダー基本情報 ======
-  const calendarEl = document.getElementById('calendar');
-  const calTitleEl = document.getElementById('calTitle');
-  const prevBtn = document.getElementById('prevMonth');
-  const nextBtn = document.getElementById('nextMonth');
+/* -------------------------
+   基本変数
+------------------------- */
+let events = [];
+let currentColor = "#007bff";
+let editColor = "#007bff";
+let editingId = null;
 
-  const eventTitleInput = document.getElementById('eventTitle');
-  const repeatTypeSelect = document.getElementById('repeatType');
-  const colorButtonsEl = document.getElementById('colorButtons');
+const today = new Date();
+let currentYear = today.getFullYear();
+let currentMonth = today.getMonth();
 
-  const today = new Date();
-  let currentYear = today.getFullYear();
-  let currentMonth = today.getMonth(); // 0-11
+const calendarEl = document.getElementById("calendar");
+const calTitleEl = document.getElementById("calTitle");
 
-  // 予定データ
-  // { id, title, color, baseDate: 'YYYY-MM-DD', repeat: 'none'|'weekly'|'monthly'|'yearly' }
-  let events = [];
-  let currentColor = '#007bff';
-  let dragEventId = null;
+/* -------------------------
+   保存・読み込み
+------------------------- */
+function saveEvents() {
+  localStorage.setItem("calendarEvents", JSON.stringify(events));
+}
+function loadEvents() {
+  const data = localStorage.getItem("calendarEvents");
+  if (data) events = JSON.parse(data);
+}
+loadEvents();
 
-  // ====== 色ボタン ======
-  colorButtonsEl.addEventListener('click', (e) => {
-    if (e.target.tagName === 'BUTTON') {
-      currentColor = e.target.dataset.color;
-      [...colorButtonsEl.children].forEach(btn => btn.classList.remove('selected'));
-      e.target.classList.add('selected');
-    }
+/* -------------------------
+   色選択
+------------------------- */
+document.getElementById("colorButtons").addEventListener("click", e => {
+  if (e.target.tagName === "BUTTON") {
+    currentColor = e.target.dataset.color;
+  }
+});
+
+/* -------------------------
+   カレンダー描画
+------------------------- */
+function renderCalendar() {
+  calendarEl.innerHTML = "";
+
+  const dow = ["日","月","火","水","木","金","土"];
+  dow.forEach(d => {
+    const h = document.createElement("div");
+    h.className = "dow";
+    h.textContent = d;
+    calendarEl.appendChild(h);
   });
-  // 初期選択
-  colorButtonsEl.children[0].classList.add('selected');
 
-  // ====== 曜日ヘッダ作成 ======
-  const dowNames = ['日','月','火','水','木','金','土'];
+  const first = new Date(currentYear, currentMonth, 1);
+  const startDow = first.getDay();
+  const days = new Date(currentYear, currentMonth + 1, 0).getDate();
 
-  function renderCalendar() {
-    calendarEl.innerHTML = '';
+  calTitleEl.textContent = `${currentYear}年 ${currentMonth+1}月`;
 
-    // 曜日行
-    dowNames.forEach(d => {
-      const h = document.createElement('div');
-      h.className = 'dow';
-      h.textContent = d;
-      calendarEl.appendChild(h);
+  for (let i=0;i<startDow;i++){
+    const empty = document.createElement("div");
+    empty.className = "day-cell";
+    calendarEl.appendChild(empty);
+  }
+
+  for (let d=1; d<=days; d++){
+    const cell = document.createElement("div");
+    cell.className = "day-cell";
+
+    const dateObj = new Date(currentYear, currentMonth, d);
+    const dateStr = toStr(dateObj);
+
+    if (isSame(dateObj, today)) cell.classList.add("today");
+
+    const num = document.createElement("div");
+    num.textContent = d;
+    num.style.fontWeight = "bold";
+    cell.appendChild(num);
+
+    getEvents(dateObj).forEach(ev => {
+      const evEl = document.createElement("div");
+      evEl.className = "event";
+      evEl.style.background = ev.color;
+      evEl.textContent = ev.title;
+      evEl.dataset.id = ev.id;
+
+      evEl.addEventListener("click", e => {
+        e.stopPropagation();
+        openEdit(ev.id);
+      });
+
+      cell.appendChild(evEl);
     });
 
-    const firstDay = new Date(currentYear, currentMonth, 1);
-    const startDow = firstDay.getDay();
-    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-
-    calTitleEl.textContent = `${currentYear}年 ${currentMonth + 1}月`;
-
-    // 前の月の空白
-    for (let i = 0; i < startDow; i++) {
-      const empty = document.createElement('div');
-      empty.className = 'day-cell';
-      calendarEl.appendChild(empty);
-    }
-
-    // 日付セル
-    for (let d = 1; d <= daysInMonth; d++) {
-      const cell = document.createElement('div');
-      cell.className = 'day-cell';
-      const dateObj = new Date(currentYear, currentMonth, d);
-      const dateStr = toDateStr(dateObj);
-      cell.dataset.date = dateStr;
-
-      const num = document.createElement('div');
-      num.className = 'day-number';
-      num.textContent = d;
-      cell.appendChild(num);
-
-      // 今日なら強調
-      if (isSameDate(dateObj, today)) {
-        cell.classList.add('today');
-      }
-
-      // 予定を描画
-      const dayEvents = getEventsForDate(dateObj);
-      dayEvents.forEach(ev => {
-        const evEl = document.createElement('div');
-        evEl.className = 'event';
-        evEl.textContent = ev.title;
-        evEl.style.background = ev.color;
-        evEl.draggable = true;
-        evEl.dataset.id = ev.id;
-
-        // 今日の予定ならさらに目立たせる（白枠）
-        if (isSameDate(dateObj, today)) {
-          evEl.style.boxShadow = '0 0 0 2px #fff';
-        }
-
-        // ドラッグ開始
-        evEl.addEventListener('dragstart', (e) => {
-          dragEventId = ev.id;
-          evEl.classList.add('dragging');
-        });
-        evEl.addEventListener('dragend', (e) => {
-          dragEventId = null;
-          evEl.classList.remove('dragging');
-          clearDropTargets();
-        });
-
-        cell.appendChild(evEl);
-      });
-
-      // ドロップ関連
-      cell.addEventListener('dragover', (e) => {
-        if (dragEventId !== null) {
-          e.preventDefault();
-          cell.classList.add('drop-target');
-        }
-      });
-      cell.addEventListener('dragleave', () => {
-        cell.classList.remove('drop-target');
-      });
-      cell.addEventListener('drop', () => {
-        if (dragEventId !== null) {
-          moveEventToDate(dragEventId, dateStr);
-          dragEventId = null;
-          clearDropTargets();
-          renderCalendar();
-        }
-      });
-
-      // クリックで予定追加
-      cell.addEventListener('click', (e) => {
-        // event要素をクリックしたときは追加しない
-        if (e.target.classList.contains('event')) return;
-        addEventToDate(dateStr);
-      });
-
-      calendarEl.appendChild(cell);
-    }
-  }
-
-  function clearDropTargets() {
-    document.querySelectorAll('.day-cell.drop-target').forEach(c => c.classList.remove('drop-target'));
-  }
-
-  // ====== 日付文字列変換 ======
-  function toDateStr(d) {
-    const y = d.getFullYear();
-    const m = ('0' + (d.getMonth() + 1)).slice(-2);
-    const day = ('0' + d.getDate()).slice(-2);
-    return `${y}-${m}-${day}`;
-  }
-
-  function isSameDate(a, b) {
-    return a.getFullYear() === b.getFullYear() &&
-           a.getMonth() === b.getMonth() &&
-           a.getDate() === b.getDate();
-  }
-
-  // ====== 予定取得（繰り返し判定込み） ======
-  function getEventsForDate(dateObj) {
-    const result = [];
-    const targetStr = toDateStr(dateObj);
-    const targetDow = dateObj.getDay();
-    const targetDay = dateObj.getDate();
-    const targetMonth = dateObj.getMonth() + 1;
-    const targetYear = dateObj.getFullYear();
-
-    events.forEach(ev => {
-      const base = parseDateStr(ev.baseDate);
-      if (!base) return;
-
-      if (ev.repeat === 'none') {
-        if (ev.baseDate === targetStr) result.push(ev);
-      } else if (ev.repeat === 'weekly') {
-        // baseDate 以降で、曜日が同じ
-        if (dateObj >= base && base.getDay() === targetDow) {
-          result.push(ev);
-        }
-      } else if (ev.repeat === 'monthly') {
-        // baseDate 以降で、日付が同じ
-        if (dateObj >= base && base.getDate() === targetDay) {
-          result.push(ev);
-        }
-      } else if (ev.repeat === 'yearly') {
-        // baseDate 以降で、月日が同じ
-        if (dateObj >= base &&
-            (base.getMonth() + 1) === targetMonth &&
-            base.getDate() === targetDay) {
-          result.push(ev);
-        }
-      }
+    cell.addEventListener("click", () => {
+      document.getElementById("eventTitle").value = "";
+      addEvent(dateStr);
     });
 
-    return result;
+    calendarEl.appendChild(cell);
   }
+}
 
-  function parseDateStr(str) {
-    const [y, m, d] = str.split('-').map(Number);
-    if (!y || !m || !d) return null;
-    return new Date(y, m - 1, d);
-  }
+/* -------------------------
+   日付文字列
+------------------------- */
+function toStr(d){
+  const y=d.getFullYear();
+  const m=("0"+(d.getMonth()+1)).slice(-2);
+  const da=("0"+d.getDate()).slice(-2);
+  return `${y}-${m}-${da}`;
+}
+function isSame(a,b){
+  return a.getFullYear()==b.getFullYear() &&
+         a.getMonth()==b.getMonth() &&
+         a.getDate()==b.getDate();
+}
 
-  // ====== 予定追加 ======
-  function addEventToDate(dateStr) {
-    const title = eventTitleInput.value.trim();
-    if (!title) {
-      alert('予定タイトルを入力してください。');
-      return;
-    }
-    const repeat = repeatTypeSelect.value;
+/* -------------------------
+   予定取得（繰り返し対応）
+------------------------- */
+function getEvents(dateObj){
+  const res=[];
+  const ds=toStr(dateObj);
+  const dow=dateObj.getDay();
+  const day=dateObj.getDate();
+  const mon=dateObj.getMonth()+1;
 
-    const newEvent = {
-      id: Date.now().toString() + Math.random().toString(16).slice(2),
-      title,
-      color: currentColor,
-      baseDate: dateStr,
-      repeat
-    };
-    events.push(newEvent);
-    renderCalendar();
-  }
+  events.forEach(ev=>{
+    const base=new Date(ev.baseDate);
 
-  // ====== 予定移動（ドラッグ＆ドロップ） ======
-  function moveEventToDate(eventId, newDateStr) {
-    const ev = events.find(e => e.id === eventId);
-    if (!ev) return;
-    // 繰り返し予定も「基準日」を移動させる仕様
-    ev.baseDate = newDateStr;
-  }
-
-  // ====== 月移動 ======
-  prevBtn.addEventListener('click', () => {
-    currentMonth--;
-    if (currentMonth < 0) {
-      currentMonth = 11;
-      currentYear--;
-    }
-    renderCalendar();
+    if(ev.repeat==="none" && ev.baseDate===ds) res.push(ev);
+    if(ev.repeat==="weekly" && dateObj>=base && base.getDay()===dow) res.push(ev);
+    if(ev.repeat==="monthly" && dateObj>=base && base.getDate()===day) res.push(ev);
+    if(ev.repeat==="yearly" && dateObj>=base &&
+       base.getMonth()+1===mon && base.getDate()===day) res.push(ev);
   });
 
-  nextBtn.addEventListener('click', () => {
-    currentMonth++;
-    if (currentMonth > 11) {
-      currentMonth = 0;
-      currentYear++;
-    }
-    renderCalendar();
+  return res;
+}
+
+/* -------------------------
+   予定追加
+------------------------- */
+function addEvent(dateStr){
+  const title=document.getElementById("eventTitle").value.trim();
+  if(!title) return;
+
+  const repeat=document.getElementById("repeatType").value;
+
+  events.push({
+    id: Date.now().toString(),
+    title,
+    color: currentColor,
+    baseDate: dateStr,
+    repeat
   });
 
-  // 初期描画
+  saveEvents();
   renderCalendar();
+}
+
+/* -------------------------
+   編集モーダル
+------------------------- */
+const modalBg=document.getElementById("modalBg");
+
+function openEdit(id){
+  editingId=id;
+  const ev=events.find(e=>e.id===id);
+
+  document.getElementById("editTitle").value=ev.title;
+  document.getElementById("editRepeat").value=ev.repeat;
+  editColor=ev.color;
+
+  modalBg.style.display="flex";
+}
+
+document.getElementById("closeEdit").onclick=()=>{
+  modalBg.style.display="none";
+};
+
+document.getElementById("deleteEdit").onclick=()=>{
+  events=events.filter(e=>e.id!==editingId);
+  saveEvents();
+  modalBg.style.display="none";
+  renderCalendar();
+};
+
+document.getElementById("editColors").onclick=(e)=>{
+  if(e.target.tagName==="BUTTON"){
+    editColor=e.target.dataset.color;
+  }
+};
+
+document.getElementById("saveEdit").onclick=()=>{
+  const ev=events.find(e=>e.id===editingId);
+  ev.title=document.getElementById("editTitle").value;
+  ev.repeat=document.getElementById("editRepeat").value;
+  ev.color=editColor;
+
+  saveEvents();
+  modalBg.style.display="none";
+  renderCalendar();
+};
+
+/* -------------------------
+   月移動
+------------------------- */
+document.getElementById("prevMonth").onclick=()=>{
+  currentMonth--;
+  if(currentMonth<0){ currentMonth=11; currentYear--; }
+  renderCalendar();
+};
+document.getElementById("nextMonth").onclick=()=>{
+  currentMonth++;
+  if(currentMonth>11){ currentMonth=0; currentYear++; }
+  renderCalendar();
+};
+
+/* -------------------------
+   スワイプで月切り替え
+------------------------- */
+let startX=0;
+const swipeArea=document.getElementById("swipeArea");
+
+swipeArea.addEventListener("touchstart", e=>{
+  startX=e.touches[0].clientX;
+});
+swipeArea.addEventListener("touchend", e=>{
+  const endX=e.changedTouches[0].clientX;
+  const diff=endX-startX;
+
+  if(Math.abs(diff)>50){
+    if(diff<0){
+      currentMonth++;
+      if(currentMonth>11){ currentMonth=0; currentYear++; }
+    }else{
+      currentMonth--;
+      if(currentMonth<0){ currentMonth=11; currentYear--; }
+    }
+    renderCalendar();
+  }
+});
+
+/* PCドラッグでもスワイプ扱い */
+let mouseDown=false;
+swipeArea.addEventListener("mousedown", e=>{
+  mouseDown=true;
+  startX=e.clientX;
+});
+swipeArea.addEventListener("mouseup", e=>{
+  if(!mouseDown) return;
+  mouseDown=false;
+
+  const diff=e.clientX-startX;
+  if(Math.abs(diff)>50){
+    if(diff<0){
+      currentMonth++;
+      if(currentMonth>11){ currentMonth=0; currentYear++; }
+    }else{
+      currentMonth--;
+      if(currentMonth<0){ currentMonth=11; currentYear--; }
+    }
+    renderCalendar();
+  }
+});
+
+/* -------------------------
+   初期描画
+------------------------- */
+renderCalendar();
 </script>
 </body>
 </html>
