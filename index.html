@@ -103,6 +103,14 @@
     margin-bottom: 8px;
   }
 
+  .digit-boxes {
+    margin: 8px 0;
+  }
+  .digit-boxes label {
+    margin-right: 6px;
+    font-size: 14px;
+  }
+
   .color-buttons button {
     width: 26px;
     height: 26px;
@@ -149,6 +157,20 @@
       <option value="yearly">毎年</option>
     </select>
 
+    <div class="digit-boxes" id="digitBoxes">
+      <div>数字が付く日（複数選択可）</div>
+      <label><input type="checkbox" value="0">0</label>
+      <label><input type="checkbox" value="1">1</label>
+      <label><input type="checkbox" value="2">2</label>
+      <label><input type="checkbox" value="3">3</label>
+      <label><input type="checkbox" value="4">4</label>
+      <label><input type="checkbox" value="5">5</label>
+      <label><input type="checkbox" value="6">6</label>
+      <label><input type="checkbox" value="7">7</label>
+      <label><input type="checkbox" value="8">8</label>
+      <label><input type="checkbox" value="9">9</label>
+    </div>
+
     <div class="color-buttons" id="modalColors">
       <button data-color="#007bff" style="background:#007bff"></button>
       <button data-color="#28a745" style="background:#28a745"></button>
@@ -162,6 +184,15 @@
       <button id="modalDelete" style="background:#dc3545;color:#fff;display:none;">削除</button>
       <button id="modalClose">閉じる</button>
     </div>
+  </div>
+</div>
+
+<!-- 予定一覧モーダル -->
+<div class="modal-bg" id="listModalBg">
+  <div class="modal">
+    <h3 id="listModalTitle">予定一覧</h3>
+    <div id="listContent"></div>
+    <button id="listClose">閉じる</button>
   </div>
 </div>
 
@@ -246,8 +277,19 @@ function renderCalendar() {
       cell.appendChild(evEl);
     });
 
+    let tapTimer = null;
+
     cell.addEventListener("click", () => {
-      openAdd(dateStr);
+      if (tapTimer == null) {
+        tapTimer = setTimeout(() => {
+          tapTimer = null;
+          openList(dateStr);
+        }, 250);
+      } else {
+        clearTimeout(tapTimer);
+        tapTimer = null;
+        openAdd(dateStr);
+      }
     });
 
     calendarEl.appendChild(cell);
@@ -270,7 +312,7 @@ function isSame(a,b){
 }
 
 /* -------------------------
-   予定取得（繰り返し対応）
+   予定取得（繰り返し対応 + 数字が付く日）
 ------------------------- */
 function getEvents(dateObj){
   const res=[];
@@ -287,6 +329,13 @@ function getEvents(dateObj){
     if(ev.repeat==="monthly" && dateObj>=base && base.getDate()===day) res.push(ev);
     if(ev.repeat==="yearly" && dateObj>=base &&
        base.getMonth()+1===mon && base.getDate()===day) res.push(ev);
+
+    if (ev.digits && ev.digits.length > 0) {
+      const dayStr = String(day);
+      if (ev.digits.some(d => dayStr.includes(d))) {
+        if (dateObj >= base) res.push(ev);
+      }
+    }
   });
 
   return res;
@@ -312,6 +361,18 @@ document.getElementById("modalColors").onclick = e => {
   }
 };
 
+/* 数字チェック取得 */
+function getSelectedDigits() {
+  const boxes = document.querySelectorAll("#digitBoxes input");
+  return [...boxes].filter(b => b.checked).map(b => b.value);
+}
+
+/* 数字チェック反映 */
+function setSelectedDigits(arr) {
+  const boxes = document.querySelectorAll("#digitBoxes input");
+  boxes.forEach(b => b.checked = arr.includes(b.value));
+}
+
 /* -------------------------
    予定追加モード
 ------------------------- */
@@ -324,6 +385,7 @@ function openAdd(dateStr){
   modalRepeat.value = "none";
   modalColor = "#007bff";
   modalDelete.style.display = "none";
+  setSelectedDigits([]);
 
   modalBg.style.display = "flex";
 }
@@ -340,6 +402,7 @@ function openEdit(id){
   modalRepeat.value = ev.repeat;
   modalColor = ev.color;
   modalDelete.style.display = "inline-block";
+  setSelectedDigits(ev.digits || []);
 
   modalBg.style.display = "flex";
 }
@@ -352,6 +415,7 @@ document.getElementById("modalSave").onclick = () => {
   if (!title) return;
 
   const repeat = modalRepeat.value;
+  const digits = getSelectedDigits();
 
   if (editingId === null) {
     events.push({
@@ -359,13 +423,15 @@ document.getElementById("modalSave").onclick = () => {
       title,
       color: modalColor,
       baseDate: selectedDate,
-      repeat
+      repeat,
+      digits
     });
   } else {
     const ev = events.find(e => e.id === editingId);
     ev.title = title;
     ev.color = modalColor;
     ev.repeat = repeat;
+    ev.digits = digits;
   }
 
   saveEvents();
@@ -381,6 +447,45 @@ modalDelete.onclick = () => {
   saveEvents();
   modalBg.style.display = "none";
   renderCalendar();
+};
+
+/* -------------------------
+   予定一覧モーダル
+------------------------- */
+const listModalBg = document.getElementById("listModalBg");
+const listContent = document.getElementById("listContent");
+const listModalTitle = document.getElementById("listModalTitle");
+
+function openList(dateStr){
+  const dateObj = new Date(dateStr);
+  listModalTitle.textContent = `${dateObj.getMonth()+1}月${dateObj.getDate()}日の予定`;
+
+  const list = getEvents(dateObj);
+
+  if (list.length === 0) {
+    listContent.innerHTML = "<p>予定はありません</p>";
+  } else {
+    listContent.innerHTML = list.map(ev => `
+      <div style="margin:6px 0;padding:6px;background:#f0f0f0;border-radius:4px;">
+        <b style="color:${ev.color}">${ev.title}</b><br>
+        <button onclick="openEdit('${ev.id}')">編集</button>
+        <button onclick="deleteFromList('${ev.id}')">削除</button>
+      </div>
+    `).join("");
+  }
+
+  listModalBg.style.display = "flex";
+}
+
+function deleteFromList(id){
+  events = events.filter(e => e.id !== id);
+  saveEvents();
+  listModalBg.style.display = "none";
+  renderCalendar();
+}
+
+document.getElementById("listClose").onclick = () => {
+  listModalBg.style.display = "none";
 };
 
 /* -------------------------
