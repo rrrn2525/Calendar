@@ -374,28 +374,22 @@ function renderCalendar() {
       cell.appendChild(evEl);
     });
 
-    let tapTimer = null;
+    cell.addEventListener("click", () => {
 
-   cell.addEventListener("click", () => {
-  if (tapTimer == null) {
-    tapTimer = setTimeout(() => {
-      tapTimer = null;
-
-      // ★ タップした日に色を付ける（これだけでOK）
-      if (selectedCell) {
-        selectedCell.classList.remove("selected-day");
-      }
-      cell.classList.add("selected-day");
-      selectedCell = cell;
-
-      showDayEvents(dateStr);
-    }, 250);
-  } else {
-    clearTimeout(tapTimer);
-    tapTimer = null;
+  if (selectedCell === cell) {
     openAdd(dateStr);
+    return;
   }
+
+  if (selectedCell) {
+    selectedCell.classList.remove("selected-day");
+  }
+  cell.classList.add("selected-day");
+  selectedCell = cell;
+
+  showDayEvents(dateStr);
 });
+
    
     calendarEl.appendChild(cell);
   }
