@@ -24,10 +24,6 @@
     justify-content: space-between;
     margin-bottom: 8px;
   }
-  .cal-header button {
-    padding: 4px 8px;
-    font-size: 14px;
-  }
   .cal-title {
     font-weight: bold;
     font-size: 16px;
@@ -64,22 +60,9 @@
     color: #fff;
     font-size: 10px;
     cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .event button {
-    background: rgba(0,0,0,0.3);
-    border: none;
-    color: #fff;
-    font-size: 10px;
-    margin-left: 4px;
-    cursor: pointer;
-    border-radius: 2px;
-    padding: 0 3px;
   }
 
-  /* 編集モーダル */
+  /* モーダル */
   .modal-bg {
     position: fixed;
     top: 0; left: 0;
@@ -101,17 +84,17 @@
     padding: 6px;
     margin-bottom: 8px;
   }
-  .modal .color-buttons button {
+  .color-buttons button {
     width: 24px; height: 24px;
     border-radius: 50%;
     border: none;
     margin-right: 4px;
   }
-  .modal .btn-row {
+  .btn-row {
     display: flex;
     justify-content: space-between;
   }
-  .modal button {
+  .btn-row button {
     padding: 6px 10px;
     font-size: 14px;
   }
@@ -127,44 +110,23 @@
   </div>
 
   <div class="calendar-grid" id="calendar"></div>
-
-  <div class="controls">
-    <label>予定タイトル</label>
-    <input type="text" id="eventTitle">
-
-    <label>繰り返し</label>
-    <select id="repeatType">
-      <option value="none">なし</option>
-      <option value="weekly">毎週</option>
-      <option value="monthly">毎月</option>
-      <option value="yearly">毎年</option>
-    </select>
-
-    <label>色</label>
-    <div class="color-buttons" id="colorButtons">
-      <button data-color="#007bff" style="background:#007bff"></button>
-      <button data-color="#28a745" style="background:#28a745"></button>
-      <button data-color="#ffc107" style="background:#ffc107"></button>
-      <button data-color="#dc3545" style="background:#dc3545"></button>
-      <button data-color="#6f42c1" style="background:#6f42c1"></button>
-    </div>
-    <small>日付を押すと予定追加（タイトルは初期化）</small>
-  </div>
 </div>
 
-<!-- 編集モーダル -->
+<!-- 予定追加・編集モーダル -->
 <div class="modal-bg" id="modalBg">
   <div class="modal">
-    <h3>予定を編集</h3>
-    <input type="text" id="editTitle">
-    <select id="editRepeat">
-      <option value="none">なし</option>
+    <h3 id="modalTitle">予定を追加</h3>
+
+    <input type="text" id="modalEventTitle" placeholder="予定タイトル">
+
+    <select id="modalRepeat">
+      <option value="none">繰り返しなし</option>
       <option value="weekly">毎週</option>
       <option value="monthly">毎月</option>
       <option value="yearly">毎年</option>
     </select>
 
-    <div class="color-buttons" id="editColors">
+    <div class="color-buttons" id="modalColors">
       <button data-color="#007bff" style="background:#007bff"></button>
       <button data-color="#28a745" style="background:#28a745"></button>
       <button data-color="#ffc107" style="background:#ffc107"></button>
@@ -173,9 +135,9 @@
     </div>
 
     <div class="btn-row">
-      <button id="saveEdit">保存</button>
-      <button id="deleteEdit">削除</button>
-      <button id="closeEdit">閉じる</button>
+      <button id="modalSave">保存</button>
+      <button id="modalDelete" style="background:#dc3545;color:#fff;display:none;">削除</button>
+      <button id="modalClose">閉じる</button>
     </div>
   </div>
 </div>
@@ -185,16 +147,11 @@
    基本変数
 ------------------------- */
 let events = [];
-let currentColor = "#007bff";
-let editColor = "#007bff";
+let currentYear = new Date().getFullYear();
+let currentMonth = new Date().getMonth();
+let selectedDate = null;
 let editingId = null;
-
-const today = new Date();
-let currentYear = today.getFullYear();
-let currentMonth = today.getMonth();
-
-const calendarEl = document.getElementById("calendar");
-const calTitleEl = document.getElementById("calTitle");
+let modalColor = "#007bff";
 
 /* -------------------------
    保存・読み込み
@@ -209,17 +166,11 @@ function loadEvents() {
 loadEvents();
 
 /* -------------------------
-   色選択
-------------------------- */
-document.getElementById("colorButtons").addEventListener("click", e => {
-  if (e.target.tagName === "BUTTON") {
-    currentColor = e.target.dataset.color;
-  }
-});
-
-/* -------------------------
    カレンダー描画
 ------------------------- */
+const calendarEl = document.getElementById("calendar");
+const calTitleEl = document.getElementById("calTitle");
+
 function renderCalendar() {
   calendarEl.innerHTML = "";
 
@@ -250,7 +201,7 @@ function renderCalendar() {
     const dateObj = new Date(currentYear, currentMonth, d);
     const dateStr = toStr(dateObj);
 
-    if (isSame(dateObj, today)) cell.classList.add("today");
+    if (isSame(dateObj, new Date())) cell.classList.add("today");
 
     const num = document.createElement("div");
     num.textContent = d;
@@ -273,8 +224,7 @@ function renderCalendar() {
     });
 
     cell.addEventListener("click", () => {
-      document.getElementById("eventTitle").value = "";
-      addEvent(dateStr);
+      openAdd(dateStr);
     });
 
     calendarEl.appendChild(cell);
@@ -320,127 +270,128 @@ function getEvents(dateObj){
 }
 
 /* -------------------------
-   予定追加
+   モーダル制御
 ------------------------- */
-function addEvent(dateStr){
-  const title=document.getElementById("eventTitle").value.trim();
-  if(!title) return;
+const modalBg = document.getElementById("modalBg");
+const modalTitle = document.getElementById("modalTitle");
+const modalEventTitle = document.getElementById("modalEventTitle");
+const modalRepeat = document.getElementById("modalRepeat");
+const modalDelete = document.getElementById("modalDelete");
 
-  const repeat=document.getElementById("repeatType").value;
-
-  events.push({
-    id: Date.now().toString(),
-    title,
-    color: currentColor,
-    baseDate: dateStr,
-    repeat
-  });
-
-  saveEvents();
-  renderCalendar();
-}
-
-/* -------------------------
-   編集モーダル
-------------------------- */
-const modalBg=document.getElementById("modalBg");
-
-function openEdit(id){
-  editingId=id;
-  const ev=events.find(e=>e.id===id);
-
-  document.getElementById("editTitle").value=ev.title;
-  document.getElementById("editRepeat").value=ev.repeat;
-  editColor=ev.color;
-
-  modalBg.style.display="flex";
-}
-
-document.getElementById("closeEdit").onclick=()=>{
-  modalBg.style.display="none";
+document.getElementById("modalClose").onclick = () => {
+  modalBg.style.display = "none";
 };
 
-document.getElementById("deleteEdit").onclick=()=>{
-  events=events.filter(e=>e.id!==editingId);
-  saveEvents();
-  modalBg.style.display="none";
-  renderCalendar();
-};
-
-document.getElementById("editColors").onclick=(e)=>{
-  if(e.target.tagName==="BUTTON"){
-    editColor=e.target.dataset.color;
+/* 色選択 */
+document.getElementById("modalColors").onclick = e => {
+  if (e.target.tagName === "BUTTON") {
+    modalColor = e.target.dataset.color;
   }
 };
 
-document.getElementById("saveEdit").onclick=()=>{
-  const ev=events.find(e=>e.id===editingId);
-  ev.title=document.getElementById("editTitle").value;
-  ev.repeat=document.getElementById("editRepeat").value;
-  ev.color=editColor;
+/* -------------------------
+   予定追加モード
+------------------------- */
+function openAdd(dateStr){
+  selectedDate = dateStr;
+  editingId = null;
+
+  modalTitle.textContent = "予定を追加";
+  modalEventTitle.value = "";
+  modalRepeat.value = "none";
+  modalColor = "#007bff";
+  modalDelete.style.display = "none";
+
+  modalBg.style.display = "flex";
+}
+
+/* -------------------------
+   予定編集モード
+------------------------- */
+function openEdit(id){
+  editingId = id;
+  const ev = events.find(e => e.id === id);
+
+  modalTitle.textContent = "予定を編集";
+  modalEventTitle.value = ev.title;
+  modalRepeat.value = ev.repeat;
+  modalColor = ev.color;
+  modalDelete.style.display = "inline-block";
+
+  modalBg.style.display = "flex";
+}
+
+/* -------------------------
+   保存ボタン
+------------------------- */
+document.getElementById("modalSave").onclick = () => {
+  const title = modalEventTitle.value.trim();
+  if (!title) return;
+
+  const repeat = modalRepeat.value;
+
+  if (editingId === null) {
+    events.push({
+      id: Date.now().toString(),
+      title,
+      color: modalColor,
+      baseDate: selectedDate,
+      repeat
+    });
+  } else {
+    const ev = events.find(e => e.id === editingId);
+    ev.title = title;
+    ev.color = modalColor;
+    ev.repeat = repeat;
+  }
 
   saveEvents();
-  modalBg.style.display="none";
+  modalBg.style.display = "none";
+  renderCalendar();
+};
+
+/* -------------------------
+   削除ボタン
+------------------------- */
+modalDelete.onclick = () => {
+  events = events.filter(e => e.id !== editingId);
+  saveEvents();
+  modalBg.style.display = "none";
   renderCalendar();
 };
 
 /* -------------------------
    月移動
 ------------------------- */
-document.getElementById("prevMonth").onclick=()=>{
+document.getElementById("prevMonth").onclick = () => {
   currentMonth--;
-  if(currentMonth<0){ currentMonth=11; currentYear--; }
+  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
   renderCalendar();
 };
-document.getElementById("nextMonth").onclick=()=>{
+document.getElementById("nextMonth").onclick = () => {
   currentMonth++;
-  if(currentMonth>11){ currentMonth=0; currentYear++; }
+  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
   renderCalendar();
 };
 
 /* -------------------------
    スワイプで月切り替え
 ------------------------- */
-let startX=0;
-const swipeArea=document.getElementById("swipeArea");
+let startX = 0;
+const swipeArea = document.getElementById("swipeArea");
 
-swipeArea.addEventListener("touchstart", e=>{
-  startX=e.touches[0].clientX;
+swipeArea.addEventListener("touchstart", e => {
+  startX = e.touches[0].clientX;
 });
-swipeArea.addEventListener("touchend", e=>{
-  const endX=e.changedTouches[0].clientX;
-  const diff=endX-startX;
-
-  if(Math.abs(diff)>50){
-    if(diff<0){
+swipeArea.addEventListener("touchend", e => {
+  const diff = e.changedTouches[0].clientX - startX;
+  if (Math.abs(diff) > 50) {
+    if (diff < 0) {
       currentMonth++;
-      if(currentMonth>11){ currentMonth=0; currentYear++; }
-    }else{
+      if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+    } else {
       currentMonth--;
-      if(currentMonth<0){ currentMonth=11; currentYear--; }
-    }
-    renderCalendar();
-  }
-});
-
-/* PCドラッグでもスワイプ扱い */
-let mouseDown=false;
-swipeArea.addEventListener("mousedown", e=>{
-  mouseDown=true;
-  startX=e.clientX;
-});
-swipeArea.addEventListener("mouseup", e=>{
-  if(!mouseDown) return;
-  mouseDown=false;
-
-  const diff=e.clientX-startX;
-  if(Math.abs(diff)>50){
-    if(diff<0){
-      currentMonth++;
-      if(currentMonth>11){ currentMonth=0; currentYear++; }
-    }else{
-      currentMonth--;
-      if(currentMonth<0){ currentMonth=11; currentYear--; }
+      if (currentMonth < 0) { currentMonth = 11; currentYear--; }
     }
     renderCalendar();
   }
