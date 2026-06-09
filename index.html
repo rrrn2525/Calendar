@@ -119,12 +119,6 @@
     border-radius: 8px;
   }
 
-  .dow:nth-child(1) { color: red; }   /* 日曜 */
-  .dow:nth-child(7) { color: blue; }  /* 土曜 */
-
-  .day-cell:nth-child(7n+1) div:first-child { color: red; }   /* 日曜 */
-  .day-cell:nth-child(7n)   div:first-child { color: blue; }  /* 土曜 */
-
   .modal input, .modal select {
     width: 100%;
     padding: 6px;
@@ -187,6 +181,20 @@
     background: #fff;
     border-radius: 6px;
   }
+
+ .dow:nth-child(1) { color: red; }   /* 日曜 */
+ .dow:nth-child(7) { color: blue; }  /* 土曜 */
+ 
+  /* 日曜（赤） */
+.calendar-grid > div:nth-child(7n + 8) div:first-child {
+  color: red;
+}
+
+/* 土曜（青） */
+.calendar-grid > div:nth-child(7n + 14) div:first-child {
+  color: blue;
+}
+
 </style>
 </head>
 
