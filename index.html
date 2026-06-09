@@ -6,6 +6,11 @@
 <title>カレンダー</title>
 
 <style>
+ .selected-day {
+  background: #d0e7ff !important;
+  outline: 2px solid #5aaaff;
+}
+
   * { box-sizing: border-box; }
   body {
     font-family: system-ui, sans-serif;
@@ -248,6 +253,8 @@ let currentMonth = new Date().getMonth();
 let selectedDate = null;
 let editingId = null;
 let modalColor = "#007bff";
+let selectedCell = null;
+
 
 /* -------------------------
    保存・読み込み
@@ -353,17 +360,26 @@ function renderCalendar() {
     let tapTimer = null;
 
     cell.addEventListener("click", () => {
-      if (tapTimer == null) {
-        tapTimer = setTimeout(() => {
-          tapTimer = null;
-          showDayEvents(dateStr);
-        }, 250);
-      } else {
-        clearTimeout(tapTimer);
-        tapTimer = null;
-        openAdd(dateStr);
+  if (tapTimer == null) {
+    tapTimer = setTimeout(() => {
+      tapTimer = null;
+
+      // ★ タップした日に色を付ける
+      if (selectedCell) {
+        selectedCell.classList.remove("selected-day");
       }
-    });
+      cell.classList.add("selected-day");
+      selectedCell = cell;
+      // ★ ここまで
+
+      showDayEvents(dateStr);
+    }, 250);
+  } else {
+    clearTimeout(tapTimer);
+    tapTimer = null;
+    openAdd(dateStr);
+  }
+});
 
     calendarEl.appendChild(cell);
   }
