@@ -2,286 +2,411 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>予定カレンダー</title>
+<title>カレンダーサンプル</title>
 <style>
-*{
-   box-sizing:border-box;
-}
-body{
-   font-family:sans-serif;
-   margin:10px;
-}
-.header{
-   display:flex;
-   justify-content:space-between;
-   align-items:center;
-   margin-bottom:10px;
-}
-button{
-   padding:8px 12px;
-}
-#monthTitle{
-   font-size:20px;
-   font-weight:bold;
-}
-.weekdays,
-#calendar{
-   display:grid;
-   grid-template-columns:repeat(7,1fr);
-   gap:3px;
-}
-.weekday{
-   text-align:center;
-   font-weight:bold;
-   padding:8px;
-   background:#eee;
-}
-.day{
-   border:1px solid #ccc;
-   min-height:100px;
-   padding:4px;
-   overflow:hidden;
-}
-.today{
-   border:3px solid red;
-}
-.day-number{
-   font-weight:bold;
-}
-.event{
-   color:white;
-   padding:3px;
-   border-radius:4px;
-   margin-top:3px;
-   font-size:12px;
-   cursor:grab;
-}
-.school{
-   background:#2196F3;
-}
-.work{
-   background:#FF9800;
-}
-.play{
-   background:#4CAF50;
-}
-.other{
-   background:#9C27B0;
-}
-@media(max-width:600px){
-   .day{
-       min-height:80px;
-   }
-   .event{
-       font-size:10px;
-   }
-}
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0;
+    padding: 10px;
+    background: #f5f5f5;
+  }
+  .calendar-wrapper {
+    max-width: 480px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  }
+  .cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .cal-header button {
+    padding: 4px 8px;
+    font-size: 14px;
+  }
+  .cal-title {
+    font-weight: bold;
+    font-size: 16px;
+  }
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+  .dow {
+    text-align: center;
+    font-size: 12px;
+    padding: 4px 0;
+    background: #f0f0f0;
+    font-weight: bold;
+  }
+  .day-cell {
+    min-height: 60px;
+    background: #fafafa;
+    border-radius: 4px;
+    padding: 2px;
+    font-size: 11px;
+    position: relative;
+    overflow: hidden;
+  }
+  .day-number {
+    font-weight: bold;
+    font-size: 12px;
+  }
+  .today {
+    outline: 2px solid #ff4d4d;
+    background: #ffecec;
+  }
+  .event {
+    margin-top: 2px;
+    padding: 1px 2px;
+    border-radius: 3px;
+    color: #fff;
+    font-size: 10px;
+    cursor: grab;
+  }
+  .event.dragging {
+    opacity: 0.5;
+  }
+  .day-cell.drop-target {
+    outline: 2px dashed #007bff;
+  }
+
+  .controls {
+    margin-top: 10px;
+    font-size: 13px;
+  }
+  .controls-row {
+    margin-bottom: 6px;
+  }
+  .color-buttons button {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: none;
+    margin-right: 4px;
+    cursor: pointer;
+  }
+  .color-buttons button.selected {
+    outline: 2px solid #000;
+  }
+  input[type="text"] {
+    width: 100%;
+    padding: 4px;
+    font-size: 13px;
+  }
+  select {
+    width: 100%;
+    padding: 4px;
+    font-size: 13px;
+  }
+
+  @media (max-width: 480px) {
+    .day-cell {
+      min-height: 52px;
+    }
+    .cal-title {
+      font-size: 14px;
+    }
+  }
 </style>
 </head>
 <body>
-<div class="header">
-<button onclick="changeMonth(-1)">◀</button>
-<div id="monthTitle"></div>
-<button onclick="changeMonth(1)">▶</button>
+<div class="calendar-wrapper">
+  <div class="cal-header">
+    <button id="prevMonth">&lt;</button>
+    <div class="cal-title" id="calTitle"></div>
+    <button id="nextMonth">&gt;</button>
+  </div>
+
+  <div class="calendar-grid" id="calendar">
+    <!-- 曜日ヘッダ -->
+  </div>
+
+  <div class="controls">
+    <div class="controls-row">
+      <label>予定タイトル</label>
+      <input type="text" id="eventTitle" placeholder="例：打ち合わせ、誕生日など">
+    </div>
+    <div class="controls-row">
+      <label>繰り返し</label>
+      <select id="repeatType">
+        <option value="none">なし</option>
+        <option value="weekly">毎週</option>
+        <option value="monthly">毎月</option>
+        <option value="yearly">毎年</option>
+      </select>
+    </div>
+    <div class="controls-row">
+      <label>色を選択</label>
+      <div class="color-buttons" id="colorButtons">
+        <button data-color="#007bff" style="background:#007bff"></button>
+        <button data-color="#28a745" style="background:#28a745"></button>
+        <button data-color="#ffc107" style="background:#ffc107"></button>
+        <button data-color="#dc3545" style="background:#dc3545"></button>
+        <button data-color="#6f42c1" style="background:#6f42c1"></button>
+      </div>
+    </div>
+    <div class="controls-row">
+      <small>※ 日付をタップすると、その日に予定を追加します。</small>
+    </div>
+  </div>
 </div>
-<div class="weekdays">
-<div class="weekday">月</div>
-<div class="weekday">火</div>
-<div class="weekday">水</div>
-<div class="weekday">木</div>
-<div class="weekday">金</div>
-<div class="weekday">土</div>
-<div class="weekday">日</div>
-</div>
-<div id="calendar"></div>
+
 <script>
-let currentDate = new Date();
-let draggedEvent = null;
-function renderCalendar(){
-   const calendar =
-       document.getElementById("calendar");
-   calendar.innerHTML = "";
-   const year =
-       currentDate.getFullYear();
-   const month =
-       currentDate.getMonth();
-   document.getElementById(
-       "monthTitle"
-   ).textContent =
-       `${year}年 ${month+1}月`;
-   let firstDay =
-       new Date(year,month,1).getDay();
-   firstDay = firstDay === 0 ? 6 : firstDay-1;
-   const lastDate =
-       new Date(year,month+1,0).getDate();
-   for(let i=0;i<firstDay;i++){
-       calendar.appendChild(
-           document.createElement("div")
-       );
-   }
-   for(let day=1;day<=lastDate;day++){
-       const key =
-           `${year}-${month+1}-${day}`;
-       const dayDiv =
-           document.createElement("div");
-       dayDiv.className="day";
-       const today =
-           new Date();
-       if(
-           day===today.getDate() &&
-           month===today.getMonth() &&
-           year===today.getFullYear()
-       ){
-           dayDiv.classList.add("today");
-       }
-       let html =
-           `<div class="day-number">${day}</div>`;
-       const events =
-           JSON.parse(
-               localStorage.getItem(key)
-               || "[]"
-           );
-       events.forEach((event,index)=>{
-           html += `
-<div
-               class="event ${event.color}"
-               draggable="true"
-               data-key="${key}"
-               data-index="${index}"
->
-               ${event.text}
-</div>`;
-       });
-       dayDiv.innerHTML = html;
-       dayDiv.addEventListener(
-           "dblclick",
-           ()=>addEvent(key)
-       );
-       dayDiv.addEventListener(
-           "dragover",
-           e=>e.preventDefault()
-       );
-       dayDiv.addEventListener(
-           "drop",
-           ()=>moveEvent(key)
-       );
-       calendar.appendChild(dayDiv);
-   }
-   document
-   .querySelectorAll(".event")
-   .forEach(el=>{
-       el.addEventListener(
-           "dragstart",
-           ()=>{
-               draggedEvent={
-                   source:
-                       el.dataset.key,
-                   index:
-                       Number(
-                           el.dataset.index
-                       )
-               };
-           }
-       );
-       el.addEventListener(
-           "click",
-           e=>{
-               e.stopPropagation();
-               if(
-                   confirm(
-                   "予定を削除しますか？"
-                   )
-               ){
-                   const key =
-                       el.dataset.key;
-                   let events =
-                       JSON.parse(
-                       localStorage
-                       .getItem(key)
-                       || "[]"
-                   );
-                   events.splice(
-                       Number(
-                           el.dataset.index
-                       ),
-                       1
-                   );
-                   localStorage
-                   .setItem(
-                       key,
-                       JSON.stringify(events)
-                   );
-                   renderCalendar();
-               }
-           }
-       );
-   });
-}
-function addEvent(key){
-   const text =
-       prompt("予定を入力");
-   if(!text) return;
-   const color =
-       prompt(
-`種類を入力
-school
-work
-play
-other`
-       );
-   let events =
-       JSON.parse(
-           localStorage.getItem(key)
-           || "[]"
-       );
-   events.push({
-       text:text,
-       color:color || "other"
-   });
-   localStorage.setItem(
-       key,
-       JSON.stringify(events)
-   );
-   renderCalendar();
-}
-function moveEvent(targetKey){
-   if(!draggedEvent) return;
-   let sourceEvents =
-       JSON.parse(
-       localStorage.getItem(
-           draggedEvent.source
-       ) || "[]"
-   );
-   const moved =
-       sourceEvents.splice(
-           draggedEvent.index,
-           1
-       )[0];
-   localStorage.setItem(
-       draggedEvent.source,
-       JSON.stringify(sourceEvents)
-   );
-   let targetEvents =
-       JSON.parse(
-           localStorage.getItem(
-               targetKey
-           ) || "[]"
-       );
-   targetEvents.push(moved);
-   localStorage.setItem(
-       targetKey,
-       JSON.stringify(targetEvents)
-   );
-   renderCalendar();
-}
-function changeMonth(num){
-   currentDate.setMonth(
-       currentDate.getMonth()+num
-   );
-   renderCalendar();
-}
-renderCalendar();
+  // ====== カレンダー基本情報 ======
+  const calendarEl = document.getElementById('calendar');
+  const calTitleEl = document.getElementById('calTitle');
+  const prevBtn = document.getElementById('prevMonth');
+  const nextBtn = document.getElementById('nextMonth');
+
+  const eventTitleInput = document.getElementById('eventTitle');
+  const repeatTypeSelect = document.getElementById('repeatType');
+  const colorButtonsEl = document.getElementById('colorButtons');
+
+  const today = new Date();
+  let currentYear = today.getFullYear();
+  let currentMonth = today.getMonth(); // 0-11
+
+  // 予定データ
+  // { id, title, color, baseDate: 'YYYY-MM-DD', repeat: 'none'|'weekly'|'monthly'|'yearly' }
+  let events = [];
+  let currentColor = '#007bff';
+  let dragEventId = null;
+
+  // ====== 色ボタン ======
+  colorButtonsEl.addEventListener('click', (e) => {
+    if (e.target.tagName === 'BUTTON') {
+      currentColor = e.target.dataset.color;
+      [...colorButtonsEl.children].forEach(btn => btn.classList.remove('selected'));
+      e.target.classList.add('selected');
+    }
+  });
+  // 初期選択
+  colorButtonsEl.children[0].classList.add('selected');
+
+  // ====== 曜日ヘッダ作成 ======
+  const dowNames = ['日','月','火','水','木','金','土'];
+
+  function renderCalendar() {
+    calendarEl.innerHTML = '';
+
+    // 曜日行
+    dowNames.forEach(d => {
+      const h = document.createElement('div');
+      h.className = 'dow';
+      h.textContent = d;
+      calendarEl.appendChild(h);
+    });
+
+    const firstDay = new Date(currentYear, currentMonth, 1);
+    const startDow = firstDay.getDay();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+    calTitleEl.textContent = `${currentYear}年 ${currentMonth + 1}月`;
+
+    // 前の月の空白
+    for (let i = 0; i < startDow; i++) {
+      const empty = document.createElement('div');
+      empty.className = 'day-cell';
+      calendarEl.appendChild(empty);
+    }
+
+    // 日付セル
+    for (let d = 1; d <= daysInMonth; d++) {
+      const cell = document.createElement('div');
+      cell.className = 'day-cell';
+      const dateObj = new Date(currentYear, currentMonth, d);
+      const dateStr = toDateStr(dateObj);
+      cell.dataset.date = dateStr;
+
+      const num = document.createElement('div');
+      num.className = 'day-number';
+      num.textContent = d;
+      cell.appendChild(num);
+
+      // 今日なら強調
+      if (isSameDate(dateObj, today)) {
+        cell.classList.add('today');
+      }
+
+      // 予定を描画
+      const dayEvents = getEventsForDate(dateObj);
+      dayEvents.forEach(ev => {
+        const evEl = document.createElement('div');
+        evEl.className = 'event';
+        evEl.textContent = ev.title;
+        evEl.style.background = ev.color;
+        evEl.draggable = true;
+        evEl.dataset.id = ev.id;
+
+        // 今日の予定ならさらに目立たせる（白枠）
+        if (isSameDate(dateObj, today)) {
+          evEl.style.boxShadow = '0 0 0 2px #fff';
+        }
+
+        // ドラッグ開始
+        evEl.addEventListener('dragstart', (e) => {
+          dragEventId = ev.id;
+          evEl.classList.add('dragging');
+        });
+        evEl.addEventListener('dragend', (e) => {
+          dragEventId = null;
+          evEl.classList.remove('dragging');
+          clearDropTargets();
+        });
+
+        cell.appendChild(evEl);
+      });
+
+      // ドロップ関連
+      cell.addEventListener('dragover', (e) => {
+        if (dragEventId !== null) {
+          e.preventDefault();
+          cell.classList.add('drop-target');
+        }
+      });
+      cell.addEventListener('dragleave', () => {
+        cell.classList.remove('drop-target');
+      });
+      cell.addEventListener('drop', () => {
+        if (dragEventId !== null) {
+          moveEventToDate(dragEventId, dateStr);
+          dragEventId = null;
+          clearDropTargets();
+          renderCalendar();
+        }
+      });
+
+      // クリックで予定追加
+      cell.addEventListener('click', (e) => {
+        // event要素をクリックしたときは追加しない
+        if (e.target.classList.contains('event')) return;
+        addEventToDate(dateStr);
+      });
+
+      calendarEl.appendChild(cell);
+    }
+  }
+
+  function clearDropTargets() {
+    document.querySelectorAll('.day-cell.drop-target').forEach(c => c.classList.remove('drop-target'));
+  }
+
+  // ====== 日付文字列変換 ======
+  function toDateStr(d) {
+    const y = d.getFullYear();
+    const m = ('0' + (d.getMonth() + 1)).slice(-2);
+    const day = ('0' + d.getDate()).slice(-2);
+    return `${y}-${m}-${day}`;
+  }
+
+  function isSameDate(a, b) {
+    return a.getFullYear() === b.getFullYear() &&
+           a.getMonth() === b.getMonth() &&
+           a.getDate() === b.getDate();
+  }
+
+  // ====== 予定取得（繰り返し判定込み） ======
+  function getEventsForDate(dateObj) {
+    const result = [];
+    const targetStr = toDateStr(dateObj);
+    const targetDow = dateObj.getDay();
+    const targetDay = dateObj.getDate();
+    const targetMonth = dateObj.getMonth() + 1;
+    const targetYear = dateObj.getFullYear();
+
+    events.forEach(ev => {
+      const base = parseDateStr(ev.baseDate);
+      if (!base) return;
+
+      if (ev.repeat === 'none') {
+        if (ev.baseDate === targetStr) result.push(ev);
+      } else if (ev.repeat === 'weekly') {
+        // baseDate 以降で、曜日が同じ
+        if (dateObj >= base && base.getDay() === targetDow) {
+          result.push(ev);
+        }
+      } else if (ev.repeat === 'monthly') {
+        // baseDate 以降で、日付が同じ
+        if (dateObj >= base && base.getDate() === targetDay) {
+          result.push(ev);
+        }
+      } else if (ev.repeat === 'yearly') {
+        // baseDate 以降で、月日が同じ
+        if (dateObj >= base &&
+            (base.getMonth() + 1) === targetMonth &&
+            base.getDate() === targetDay) {
+          result.push(ev);
+        }
+      }
+    });
+
+    return result;
+  }
+
+  function parseDateStr(str) {
+    const [y, m, d] = str.split('-').map(Number);
+    if (!y || !m || !d) return null;
+    return new Date(y, m - 1, d);
+  }
+
+  // ====== 予定追加 ======
+  function addEventToDate(dateStr) {
+    const title = eventTitleInput.value.trim();
+    if (!title) {
+      alert('予定タイトルを入力してください。');
+      return;
+    }
+    const repeat = repeatTypeSelect.value;
+
+    const newEvent = {
+      id: Date.now().toString() + Math.random().toString(16).slice(2),
+      title,
+      color: currentColor,
+      baseDate: dateStr,
+      repeat
+    };
+    events.push(newEvent);
+    renderCalendar();
+  }
+
+  // ====== 予定移動（ドラッグ＆ドロップ） ======
+  function moveEventToDate(eventId, newDateStr) {
+    const ev = events.find(e => e.id === eventId);
+    if (!ev) return;
+    // 繰り返し予定も「基準日」を移動させる仕様
+    ev.baseDate = newDateStr;
+  }
+
+  // ====== 月移動 ======
+  prevBtn.addEventListener('click', () => {
+    currentMonth--;
+    if (currentMonth < 0) {
+      currentMonth = 11;
+      currentYear--;
+    }
+    renderCalendar();
+  });
+
+  nextBtn.addEventListener('click', () => {
+    currentMonth++;
+    if (currentMonth > 11) {
+      currentMonth = 0;
+      currentYear++;
+    }
+    renderCalendar();
+  });
+
+  // 初期描画
+  renderCalendar();
 </script>
 </body>
 </html>
