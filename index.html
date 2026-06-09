@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>カレンダー</title>
+<title>カレンダー完成版</title>
 
 <style>
   * { box-sizing: border-box; }
@@ -385,14 +385,14 @@ function isSame(a,b){
 }
 
 /* -------------------------
-   予定取得（繰り返し + 一桁判定）
+   予定取得（一桁判定）
 ------------------------- */
 function getEvents(dateObj){
   const res=[];
   const ds=toStr(dateObj);
   const dow=dateObj.getDay();
   const day=dateObj.getDate();
-  const lastDigit = String(day).slice(-1); // ← 一桁だけを見る
+  const lastDigit = String(day).slice(-1);
   const mon=dateObj.getMonth()+1;
 
   events.forEach(ev=>{
@@ -443,7 +443,6 @@ function deleteFromList(id){
   saveEvents();
   renderCalendar();
   document.getElementById("dayEventList").innerHTML = "";
-}
 }
 
 /* -------------------------
