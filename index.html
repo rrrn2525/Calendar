@@ -537,36 +537,85 @@ function deleteFromList(id){
 /* -------------------------
    全予定一覧（年を消して月日だけ表示）
 ------------------------- */
+/* -------------------------
+   全体の予定一覧（色ごとにグループ化）
+------------------------- */
 function renderAllEvents(){
   const box = document.getElementById("allEventList");
 
   if (events.length === 0) {
-    box.innerHTML = "<p>全体の予定はありません</p>";
+    box.innerHTML = "<h3>全予定一覧</h3><p>予定はありません</p>";
     return;
   }
 
-  let html = "<h3>全予定一覧</h3>";
+  let html = "<h3>全予定一覧（色別）</h3>";
 
-  const sorted = sortEventsForList(events);
+  // 色順でグループ化
+  colorOrder.forEach(color => {
+    const group = events.filter(ev => ev.color === color);
+    if (group.length === 0) return;
 
-  sorted.forEach(ev => {
-
-    let dateLabel = "";
-    if(ev.repeat === "none"){
-      const d = new Date(ev.date);
-      dateLabel = `${d.getMonth()+1}/${d.getDate()}`;
-    } else {
-      dateLabel = "繰り返し";
-    }
-
+    // 色ラベル
     html += `
-      <div style="margin:6px 0;padding:6px;background:#eee;border-radius:4px;">
-        <b style="color:${ev.color}">${ev.title}</b><br>
-        <span>${dateLabel}</span><br>
-        <button onclick="openEdit('${ev.id}')">編集</button>
-        <button onclick="deleteFromList('${ev.id}')">削除</button>
+      <div style="margin-top:12px;font-weight:bold;color:${color};">
+        ● ${color} の予定
       </div>
     `;
+
+    group.forEach(ev => {
+
+      let dateLabel = "";
+      let repeatLabel = "";
+
+      // 単発
+      if(ev.repeat === "none"){
+        const d = new Date(ev.date);
+        const w = ["日","月","火","水","木","金","土"][d.getDay()];
+        dateLabel = `${d.getMonth()+1}/${d.getDate()} (${w})`;
+        repeatLabel = "単発";
+      }
+
+      // 毎週
+      else if(ev.repeat === "weekly"){
+        const w = ["日","月","火","水","木","金","土"][ev.weekday];
+        dateLabel = `${w}曜日`;
+        repeatLabel = "毎週";
+      }
+
+      // 毎月
+      else if(ev.repeat === "monthly"){
+        dateLabel = `${ev.day}日`;
+        repeatLabel = "毎月";
+      }
+
+      // 毎年
+      else if(ev.repeat === "yearly"){
+        dateLabel = `${ev.month}/${ev.day}`;
+        repeatLabel = "毎年";
+      }
+
+      // 月と日が同じ
+      else if(ev.repeat === "mdsame"){
+        dateLabel = "月日同じ";
+        repeatLabel = "月と日が同じ";
+      }
+
+      // 数字指定
+      else if(ev.digits && ev.digits.length){
+        dateLabel = `${ev.digits[0]}がつく日`;
+        repeatLabel = "数字指定";
+      }
+
+      html += `
+        <div style="margin:6px 0;padding:6px;background:#eee;border-radius:4px;">
+          <b style="color:${ev.color}">${ev.title}</b><br>
+          <span>${dateLabel}</span><br>
+          <span style="font-size:12px;color:#555;">（${repeatLabel}）</span><br>
+          <button onclick="openEdit('${ev.id}')">編集</button>
+          <button onclick="deleteFromList('${ev.id}')">削除</button>
+        </div>
+      `;
+    });
   });
 
   box.innerHTML = html;
