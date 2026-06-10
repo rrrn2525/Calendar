@@ -63,7 +63,7 @@ body {
 }
 
 .day-cell {
-  min-height: 52px;
+  min-height: 100px;
   width: 100%;
   overflow: hidden;
   background: #fafafa;
@@ -86,6 +86,7 @@ body {
 }
 
 .event {
+  display: block;
   margin-top: 2px;
   padding: 1px 2px;
   border-radius: 3px;
@@ -119,30 +120,10 @@ body {
   border-radius: 8px;
 }
 
-/* 日曜・土曜（正しい位置） */
-.calendar-grid > div:nth-child(7n + 8) div:first-child { color: red; }
-.calendar-grid > div:nth-child(7n + 14) div:first-child { color: blue; }
-
-/* サジェスト */
-#titleSuggest {
-  border: 1px solid #ccc;
-  background: #fff;
-  max-height: 120px;
-  overflow-y: auto;
-  margin-bottom: 8px;
-}
-.suggest-item {
-  padding: 6px;
-  border-bottom: 1px solid #eee;
-  cursor: pointer;
-}
-.suggest-item:hover {
-  background: #f0f0f0;
-}
-
-/* 色ボタン */
+/* 色ボタン（中央揃え） */
 .color-buttons {
   display: flex;
+  justify-content: center;
   margin: 8px 0;
 }
 .color-buttons button {
@@ -152,6 +133,9 @@ body {
   border: none;
   margin-right: 8px;
   position: relative;
+}
+.color-buttons button:last-child {
+  margin-right: 0;
 }
 .color-buttons button.selected::after {
   content: "";
@@ -177,12 +161,39 @@ body {
   border-radius: 6px;
 }
 
+/* 数字ボタン */
+.digit-row {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.digit-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px solid #aaa;
+  background: #fff;
+  font-size: 14px;
+  transition: 0.1s;
+}
+
+.digit-btn.selected {
+  background: #007bff;
+  color: #fff;
+  border-color: #007bff;
+}
+
+.digit-btn.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
 .digit-label {
   text-align: center;
   width: 100%;
   margin-top: 4px;
 }
-
 </style>
 </head>
 
@@ -215,36 +226,47 @@ body {
     <h3 id="modalTitle">予定を追加</h3>
 
     <input type="text" id="modalEventTitle" placeholder="予定タイトル">
-    <div id="titleSuggest" style="display:none;"></div>
+
+    <!-- メモ欄（固定サイズ・2行・リサイズ不可） -->
+    <textarea id="modalMemo" placeholder="メモ" rows="2"
+      style="width:100%;margin-top:6px;resize:none;" disabled></textarea>
 
     <select id="modalRepeat">
       <option value="none">繰り返しなし</option>
       <option value="weekly">毎週</option>
       <option value="monthly">毎月</option>
       <option value="yearly">毎年</option>
+      <option value="mdsame">月と日が同じ</option>
     </select>
 
-    <div class="digit-boxes" id="digitBoxes">
+    <!-- 数字ボタン（0〜4 / 改行 / 5〜9） -->
+    <div id="digitButtonsWrapper" style="margin-top:10px; text-align:center;">
+
       <div class="digit-row">
-        <label><input type="checkbox" value="0">0</label>
-        <label><input type="checkbox" value="1">1</label>
-        <label><input type="checkbox" value="2">2</label>
-        <label><input type="checkbox" value="3">3</label>
-        <label><input type="checkbox" value="4">4</label>
-        <label><input type="checkbox" value="5">5</label>
-        <label><input type="checkbox" value="6">6</label>
-        <label><input type="checkbox" value="7">7</label>
-        <label><input type="checkbox" value="8">8</label>
-        <label><input type="checkbox" value="9">9</label>
+        <button class="digit-btn" data-digit="0">0</button>
+        <button class="digit-btn" data-digit="1">1</button>
+        <button class="digit-btn" data-digit="2">2</button>
+        <button class="digit-btn" data-digit="3">3</button>
+        <button class="digit-btn" data-digit="4">4</button>
       </div>
-      <div class="digit-label">がつく日</div>
+
+      <div class="digit-row" style="margin-top:6px;">
+        <button class="digit-btn" data-digit="5">5</button>
+        <button class="digit-btn" data-digit="6">6</button>
+        <button class="digit-btn" data-digit="7">7</button>
+        <button class="digit-btn" data-digit="8">8</button>
+        <button class="digit-btn" data-digit="9">9</button>
+      </div>
+
     </div>
 
+    <div class="digit-label">がつく日</div>
+
     <div class="color-buttons" id="modalColors">
+      <button data-color="#dc3545" style="background:#dc3545"></button>
       <button data-color="#007bff" style="background:#007bff"></button>
       <button data-color="#28a745" style="background:#28a745"></button>
       <button data-color="#ffc107" style="background:#ffc107"></button>
-      <button data-color="#dc3545" style="background:#dc3545"></button>
       <button data-color="#6f42c1" style="background:#6f42c1"></button>
     </div>
 
@@ -266,7 +288,10 @@ let currentMonth = new Date().getMonth();
 let selectedCell = null;
 let selectedDate = null;
 let editingId = null;
-let modalColor = "#007bff";
+let modalColor = "#dc3545";
+
+/* 色順（赤→青→緑→黄→紫） */
+const colorOrder = ["#dc3545", "#007bff", "#28a745", "#ffc107", "#6f42c1"];
 
 /* -------------------------
    保存・読み込み
@@ -288,7 +313,6 @@ function initYM() {
   const monthSel = document.getElementById("monthSelect");
   const thisYear = new Date().getFullYear();
 
-  // 年の選択肢
   for (let y = thisYear - 5; y <= thisYear + 5; y++) {
     const op = document.createElement("option");
     op.value = y;
@@ -297,7 +321,6 @@ function initYM() {
     yearSel.appendChild(op);
   }
 
-  // 月の選択肢
   for (let m = 1; m <= 12; m++) {
     const op = document.createElement("option");
     op.value = m - 1;
@@ -307,18 +330,15 @@ function initYM() {
   }
 }
 
-/* ▼ 年を変更したら即反映 */
 document.getElementById("yearSelect").onchange = () => {
   currentYear = Number(document.getElementById("yearSelect").value);
   renderCalendar();
 };
 
-/* ▼ 月を変更したら即反映 */
 document.getElementById("monthSelect").onchange = () => {
   currentMonth = Number(document.getElementById("monthSelect").value);
   renderCalendar();
 };
-
 
 /* -------------------------
    カレンダー描画
@@ -363,7 +383,12 @@ function renderCalendar() {
     num.style.fontWeight = "bold";
     cell.appendChild(num);
 
-    getEvents(dateObj).forEach(ev => {
+    /* 色順で並べて表示 */
+    const evs = getEvents(dateObj).sort(
+      (a,b)=> colorOrder.indexOf(a.color) - colorOrder.indexOf(b.color)
+    );
+
+    evs.forEach(ev=>{
       const evEl = document.createElement("div");
       evEl.className = "event";
       evEl.style.background = ev.color;
@@ -378,8 +403,6 @@ function renderCalendar() {
       cell.appendChild(evEl);
     });
 
-    /* 1回タップ → 選択
-       同じ日をもう1回タップ → 予定追加 */
     cell.addEventListener("click", () => {
 
       if (selectedCell === cell) {
@@ -418,47 +441,65 @@ function isSame(a,b){
 }
 
 /* -------------------------
-   予定取得（〇日のみ）
+   予定取得（新仕様）
 ------------------------- */
 function getEvents(dateObj){
   const res=[];
-  const ds=toStr(dateObj);
-  const dow=dateObj.getDay();
-  const day=dateObj.getDate();
+  const ds = toStr(dateObj);
+  const dow = dateObj.getDay();
+  const day = dateObj.getDate();
+  const mon = dateObj.getMonth()+1;
   const lastDigit = String(day).slice(-1);
-  const mon=dateObj.getMonth()+1;
 
   events.forEach(ev=>{
-    const base=new Date(ev.baseDate);
 
-    // ① 繰り返しなし（当日だけ）
-    if(ev.repeat==="none" && ev.baseDate===ds) {
+    if(ev.repeat==="none" && ev.date === ds){
       res.push(ev);
       return;
     }
 
-    // ② 毎週
-    if(ev.repeat==="weekly" && dateObj>=base && base.getDay()===dow) {
+    if(ev.repeat==="weekly" && ev.weekday === dow){
       res.push(ev);
     }
 
-    // ③ 毎月
-    if(ev.repeat==="monthly" && dateObj>=base && base.getDate()===day) {
+    if(ev.repeat==="monthly" && ev.day === day){
       res.push(ev);
     }
 
-    // ④ 毎年
-    if(ev.repeat==="yearly" && base.getMonth()+1===mon && base.getDate()===day) {
+    if(ev.repeat==="yearly" && ev.month === mon && ev.day === day){
       res.push(ev);
     }
 
-    // ⑤ 〇日が付く日（digits が空のときは無視）
-    if (ev.digits && ev.digits.length > 0 && ev.digits.includes(lastDigit) && dateObj>=base) {
+    if(ev.digits && ev.digits.length && ev.digits[0] === lastDigit){
       res.push(ev);
     }
+
+    if(ev.repeat==="mdsame" && mon === day){
+      res.push(ev);
+    }
+
   });
 
   return res;
+}
+
+/* -------------------------
+   予定一覧（日付順 → 色順）
+------------------------- */
+function sortEventsForList(list){
+  return list.sort((a,b)=>{
+
+    if(a.repeat==="none" && b.repeat==="none"){
+      const diff = a.date.localeCompare(b.date);
+      if(diff !== 0) return diff;
+    }
+
+    const ca = colorOrder.indexOf(a.color);
+    const cb = colorOrder.indexOf(b.color);
+    if(ca !== cb) return ca - cb;
+
+    return a.repeat.localeCompare(b.repeat);
+  });
 }
 
 /* -------------------------
@@ -466,7 +507,7 @@ function getEvents(dateObj){
 ------------------------- */
 function showDayEvents(dateStr){
   const dateObj = new Date(dateStr);
-  const list = getEvents(dateObj);
+  const list = sortEventsForList(getEvents(dateObj));
 
   let html = `<h3>${dateObj.getMonth()+1}月${dateObj.getDate()}日の予定</h3>`;
 
@@ -476,6 +517,7 @@ function showDayEvents(dateStr){
     html += list.map(ev => `
       <div style="margin:6px 0;padding:6px;background:#f0f0f0;border-radius:4px;">
         <b style="color:${ev.color}">${ev.title}</b><br>
+        <div>${ev.memo || ""}</div>
         <button onclick="openEdit('${ev.id}')">編集</button>
         <button onclick="deleteFromList('${ev.id}')">削除</button>
       </div>
@@ -493,7 +535,7 @@ function deleteFromList(id){
 }
 
 /* -------------------------
-   全予定一覧
+   全予定一覧（年を消して月日だけ表示）
 ------------------------- */
 function renderAllEvents(){
   const box = document.getElementById("allEventList");
@@ -505,11 +547,22 @@ function renderAllEvents(){
 
   let html = "<h3>全予定一覧</h3>";
 
-  events.forEach(ev => {
+  const sorted = sortEventsForList(events);
+
+  sorted.forEach(ev => {
+
+    let dateLabel = "";
+    if(ev.repeat === "none"){
+      const d = new Date(ev.date);
+      dateLabel = `${d.getMonth()+1}/${d.getDate()}`;
+    } else {
+      dateLabel = "繰り返し";
+    }
+
     html += `
       <div style="margin:6px 0;padding:6px;background:#eee;border-radius:4px;">
         <b style="color:${ev.color}">${ev.title}</b><br>
-        基準日：${ev.baseDate}<br>
+        <span>${dateLabel}</span><br>
         <button onclick="openEdit('${ev.id}')">編集</button>
         <button onclick="deleteFromList('${ev.id}')">削除</button>
       </div>
@@ -525,6 +578,7 @@ function renderAllEvents(){
 const modalBg = document.getElementById("modalBg");
 const modalTitle = document.getElementById("modalTitle");
 const modalEventTitle = document.getElementById("modalEventTitle");
+const modalMemo = document.getElementById("modalMemo");
 const modalRepeat = document.getElementById("modalRepeat");
 const modalDelete = document.getElementById("modalDelete");
 
@@ -533,7 +587,7 @@ document.getElementById("modalClose").onclick = () => {
 };
 
 /* -------------------------
-   色選択
+   色選択（中央揃え）
 ------------------------- */
 document.getElementById("modalColors").onclick = e => {
   if (e.target.tagName === "BUTTON") {
@@ -547,44 +601,43 @@ document.getElementById("modalColors").onclick = e => {
 };
 
 /* -------------------------
-   数字チェック
+   数字選択（1つだけ）
+   タイトル未入力 or mdsame のとき無効
 ------------------------- */
-function getSelectedDigits() {
-  const boxes = document.querySelectorAll("#digitBoxes input");
-  return [...boxes].filter(b => b.checked).map(b => b.value);
-}
-function setSelectedDigits(arr) {
-  const boxes = document.querySelectorAll("#digitBoxes input");
-  boxes.forEach(b => b.checked = arr.includes(b.value));
-}
+let selectedDigit = null;
 
-/* -------------------------
-   タイトル候補（サジェスト）
-------------------------- */
-function getTitleCandidates(){
-  return [...new Set(events.map(ev => ev.title))];
-}
+function updateDigitButtonState() {
+  const title = modalEventTitle.value.trim();
+  const disabled = title === "" || modalRepeat.value === "mdsame";
 
-modalEventTitle.addEventListener("input", () => {
-  const val = modalEventTitle.value.trim();
-  const list = getTitleCandidates().filter(t => t.includes(val));
-
-  const box = document.getElementById("titleSuggest");
-
-  if (val === "" || list.length === 0) {
-    box.style.display = "none";
-    return;
-  }
-
-  box.innerHTML = list.map(t => `<div class="suggest-item">${t}</div>`).join("");
-  box.style.display = "block";
-
-  document.querySelectorAll(".suggest-item").forEach(item => {
-    item.onclick = () => {
-      modalEventTitle.value = item.textContent;
-      box.style.display = "none";
-    };
+  document.querySelectorAll(".digit-btn").forEach(btn => {
+    if (disabled) {
+      btn.classList.add("disabled");
+    } else {
+      btn.classList.remove("disabled");
+    }
   });
+}
+
+modalEventTitle.addEventListener("input", updateDigitButtonState);
+modalRepeat.addEventListener("change", updateDigitButtonState);
+
+document.querySelectorAll(".digit-btn").forEach(btn => {
+  btn.onclick = () => {
+
+    if (btn.classList.contains("disabled")) return;
+
+    document.querySelectorAll(".digit-btn")
+      .forEach(b => b.classList.remove("selected"));
+
+    btn.classList.add("selected");
+    selectedDigit = btn.dataset.digit;
+
+    const titleBox = document.getElementById("modalEventTitle");
+    const baseTitle = titleBox.value.replace(/イベント日\(.*?\)/, "").trim();
+
+    titleBox.value = `${baseTitle} イベント日(${selectedDigit}がつく日)`;
+  };
 });
 
 /* -------------------------
@@ -596,14 +649,21 @@ function openAdd(dateStr){
 
   modalTitle.textContent = "予定を追加";
   modalEventTitle.value = "";
+  modalMemo.value = "";
   modalRepeat.value = "none";
-  modalColor = "#007bff";
+  modalColor = "#dc3545";
   modalDelete.style.display = "none";
-  setSelectedDigits([]);
+
+  selectedDigit = null;
+
+  document.querySelectorAll(".digit-btn")
+    .forEach(btn => btn.classList.remove("selected"));
+
+  updateDigitButtonState();
 
   document.querySelectorAll("#modalColors button")
     .forEach(btn => btn.classList.remove("selected"));
-  document.querySelector("#modalColors button[data-color='#007bff']")
+  document.querySelector("#modalColors button[data-color='#dc3545']")
     .classList.add("selected");
 
   modalBg.style.display = "flex";
@@ -617,11 +677,23 @@ function openEdit(id){
   const ev = events.find(e => e.id === id);
 
   modalTitle.textContent = "予定を編集";
-    modalEventTitle.value = ev.title;
+  modalEventTitle.value = ev.title;
+  modalMemo.value = ev.memo || "";
   modalRepeat.value = ev.repeat;
   modalColor = ev.color;
   modalDelete.style.display = "inline-block";
-  setSelectedDigits(ev.digits || []);
+
+  selectedDigit = ev.digits && ev.digits.length ? ev.digits[0] : null;
+
+  document.querySelectorAll(".digit-btn")
+    .forEach(btn => {
+      btn.classList.remove("selected");
+      if (btn.dataset.digit === selectedDigit) {
+        btn.classList.add("selected");
+      }
+    });
+
+  updateDigitButtonState();
 
   document.querySelectorAll("#modalColors button")
     .forEach(btn => btn.classList.remove("selected"));
@@ -633,22 +705,36 @@ function openEdit(id){
 
 /* -------------------------
    保存処理
+   土曜・日曜の weekly → タイトルに自動追記
 ------------------------- */
 document.getElementById("modalSave").onclick = () => {
-  const title = modalEventTitle.value.trim();
+  let title = modalEventTitle.value.trim();
   if (!title) return;
 
   const repeat = modalRepeat.value;
-  const digits = getSelectedDigits();
+  const digits = selectedDigit ? [selectedDigit] : [];
+
+  if (repeat === "weekly") {
+    const d = new Date(selectedDate);
+    const wd = d.getDay();
+
+    if (wd === 6) title += " イベント日(土曜日)";
+    if (wd === 0) title += " イベント日(日曜日)";
+  }
 
   if (editingId === null) {
+    const d = new Date(selectedDate);
     events.push({
       id: Date.now().toString(),
       title,
+      memo: "",
       color: modalColor,
-      baseDate: selectedDate,
       repeat,
-      digits
+      digits,
+      date: selectedDate,
+      weekday: d.getDay(),
+      day: d.getDate(),
+      month: d.getMonth()+1
     });
   } else {
     const ev = events.find(e => e.id === editingId);
