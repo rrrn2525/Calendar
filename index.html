@@ -431,11 +431,28 @@ function getEvents(dateObj){
   events.forEach(ev=>{
     const base=new Date(ev.baseDate);
 
-    if(ev.repeat==="none" && ev.baseDate===ds) res.push(ev);
-    if(ev.repeat==="weekly" && dateObj>=base && base.getDay()===dow) res.push(ev);
-    if(ev.repeat==="monthly" && dateObj>=base && base.getDate()===day) res.push(ev);
-    if(ev.repeat==="yearly" && base.getMonth()+1===mon && base.getDate()===day) res.push(ev);
+    // ① 繰り返しなし（当日だけ）
+    if(ev.repeat==="none" && ev.baseDate===ds) {
+      res.push(ev);
+      return;
+    }
 
+    // ② 毎週
+    if(ev.repeat==="weekly" && dateObj>=base && base.getDay()===dow) {
+      res.push(ev);
+    }
+
+    // ③ 毎月
+    if(ev.repeat==="monthly" && dateObj>=base && base.getDate()===day) {
+      res.push(ev);
+    }
+
+    // ④ 毎年
+    if(ev.repeat==="yearly" && base.getMonth()+1===mon && base.getDate()===day) {
+      res.push(ev);
+    }
+
+    // ⑤ 〇日が付く日
     if (ev.digits && ev.digits.includes(lastDigit) && dateObj>=base) {
       res.push(ev);
     }
