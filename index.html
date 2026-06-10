@@ -452,8 +452,8 @@ function getEvents(dateObj){
       res.push(ev);
     }
 
-    // ⑤ 〇日が付く日
-    if (ev.digits && ev.digits.includes(lastDigit) && dateObj>=base) {
+    // ⑤ 〇日が付く日（digits が空のときは無視）
+    if (ev.digits && ev.digits.length > 0 && ev.digits.includes(lastDigit) && dateObj>=base) {
       res.push(ev);
     }
   });
